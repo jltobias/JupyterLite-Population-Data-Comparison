@@ -1,0 +1,93 @@
+{
+  "payload": {
+    "dataset": "global",
+    "year": 2020,
+    "geometry": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": {},
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  3.2,
+                  6.35
+                ],
+                [
+                  3.6,
+                  6.35
+                ],
+                [
+                  3.6,
+                  6.7
+                ],
+                [
+                  3.2,
+                  6.7
+                ],
+                [
+                  3.2,
+                  6.35
+                ]
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "status": 200,
+  "response": {
+    "type": "Feature",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            3.2,
+            6.35
+          ],
+          [
+            3.6,
+            6.35
+          ],
+          [
+            3.6,
+            6.7
+          ],
+          [
+            3.2,
+            6.7
+          ],
+          [
+            3.2,
+            6.35
+          ]
+        ]
+      ]
+    },
+    "properties": {
+      "min": 0.0,
+      "max": 109265.0,
+      "mean": 12551.789580514209,
+      "count": 1478,
+      "sum": 18551545.0,
+      "area": 1723.6434418322062,
+      "density": 10762.982963738716
+    }
+  },
+  "subset_sum": 18551545.0,
+  "equal": true,
+  "request_provenance": {
+    "endpoint": "https://hm52ct46i7.execute-api.us-east-1.amazonaws.com/prod/stats",
+    "method": "POST",
+    "content_type": "application/json",
+    "retrieval_date": "2026-11-06",
+    "original_request_time_utc": null,
+    "time_note": "Original request time was not retained; no timestamp is inferred."
+  },
+  "reproduce_command": "python -c \"import json,urllib.request; r=json.load(open('data/real/landscan2020_greater_lagos_official_stats.json',encoding='utf-8')); q=urllib.request.Request('https://hm52ct46i7.execute-api.us-east-1.amazonaws.com/prod/stats',data=json.dumps(r['payload']).encode(),headers={'Content-Type':'application/json'},method='POST'); print(urllib.request.urlopen(q).read().decode())\""
+}

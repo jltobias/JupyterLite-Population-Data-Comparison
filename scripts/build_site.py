@@ -10,7 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "_site"
 STAGE = ROOT / "_build"
-NOTEBOOKS = ("01_introduction.ipynb", "02_area_and_coverage.ipynb", "03_import_and_export.ipynb")
+NOTEBOOKS = ("01_real_population.ipynb", "02_real_coverage.ipynb", "03_real_exports.ipynb")
+REAL_FILES = ("worldpop-2025.tif", "grid3-2025.tif", "landscan-2020.tif", "ghspop-2025.tif", "preparation.json", "independent_oracle.json", "comparison_source_provenance.json", "worldpop-stac-item.json", "landscan2020_official_stats.json", "landscan2020_greater_lagos_official_stats.json", "ghsl_copyright.txt")
 
 
 def clean(path):
@@ -45,6 +46,9 @@ def main():
             copy(ROOT / "notebooks" / name, destination / name)
     for destination in (book, content):
         copy(ROOT / "data/demo.json", destination / "demo.json")
+        copy(ROOT / "data/population.json", destination / "population.json")
+        copy(ROOT / "data/real/independent_oracle.json", destination / "independent_oracle.json")
+        copy(ROOT / "notebooks/population_tools.py", destination / "population_tools_real.py")
     for name in ("README.md", "import-example.geojson"):
         copy(ROOT / "data" / name, content / name)
     # The runtime URL and package versions are pinned; Lab has no population-service dependency.
@@ -71,18 +75,28 @@ def main():
         raise RuntimeError("Pinned JupyterLite configuration loader changed; recheck publication cleanup.")
     bootstrap.write_text(bootstrap_text.replace(old, "const LITE_FILES = ['jupyter-lite.json'];"), encoding="utf-8", newline="\n")
     # Explicit project assets only: never publish _bmad, config, tests, credentials, or Git metadata.
-    for name in ("index.html", "app.js", "analysis.js", "style.css"):
+    for name in ("index.html", "app.js", "analysis.js", "style.css", "raster-worker.js"):
         copy(ROOT / "viewer" / name, SITE / "viewer" / name)
     for name in ("leaflet.js", "leaflet.css", "LICENSE", "images/layers.png", "images/layers-2x.png", "images/marker-icon.png", "images/marker-icon-2x.png", "images/marker-shadow.png"):
         copy(ROOT / "viewer/vendor/leaflet" / name, SITE / "viewer/vendor/leaflet" / name)
-    for name in ("demo.json", "import-example.geojson", "README.md"):
+    for name in ("geotiff-3.0.5.js", "LICENSE-geotiff", "LICENSE-companion", "RASTER-DEPENDENCIES.json", "RASTER-DEPENDENCY-LICENSES.txt", "README.md"):
+        copy(ROOT / "viewer/vendor/geotiff" / name, SITE / "viewer/vendor/geotiff" / name)
+    for name in ("demo.json", "population.json", "import-example.geojson", "README.md"):
         copy(ROOT / "data" / name, SITE / "data" / name)
+    for name in REAL_FILES:
+        copy(ROOT / "data/real" / name, SITE / "data/real" / name)
     for name in ("population-comparison-splash.png", "README.md"):
         copy(ROOT / "assets" / name, SITE / "assets" / name)
     copy(ROOT / "LICENSE", SITE / "LICENSE")
     copy(ROOT / "site/index.html", SITE / "index.html")
     (SITE / ".nojekyll").touch()
     manifest = {"fixture_sha256": hashlib.sha256((ROOT / "data/demo.json").read_bytes()).hexdigest(), "notebook_sha256": {name: hashlib.sha256((ROOT / "notebooks" / name).read_bytes()).hexdigest() for name in NOTEBOOKS}, "calculation_sha256": {"lab/files/population_tools.py": hashlib.sha256((ROOT / "notebooks/population_tools.py").read_bytes()).hexdigest(), "viewer/analysis.js": hashlib.sha256((ROOT / "viewer/analysis.js").read_bytes()).hexdigest()}, "destinations": ["book/intro.html", "lab/lab/index.html", "viewer/index.html"]}
+    manifest["population_sha256"] = hashlib.sha256((ROOT / "data/population.json").read_bytes()).hexdigest()
+    manifest["real_assets_sha256"] = {name: hashlib.sha256((ROOT / "data/real" / name).read_bytes()).hexdigest() for name in REAL_FILES}
+    manifest["calculation_sha256"]["lab/files/population_tools_real.py"] = manifest["calculation_sha256"]["lab/files/population_tools.py"]
+    manifest["calculation_sha256"]["viewer/raster-worker.js"] = hashlib.sha256((ROOT / "viewer/raster-worker.js").read_bytes()).hexdigest()
+    manifest["raster_reader_sha256"] = hashlib.sha256((ROOT / "viewer/vendor/geotiff/geotiff-3.0.5.js").read_bytes()).hexdigest()
+    manifest["launch_notebook"] = NOTEBOOKS[0]
     (SITE / "publication.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print("Built Book, Lab, and viewer in _site. Only approved publication assets were copied.")
 

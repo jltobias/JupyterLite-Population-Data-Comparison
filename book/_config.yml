@@ -9,7 +9,7 @@ execute:
 html:
   use_repository_button: true
   use_issues_button: true
-  extra_navbar: 'Synthetic teaching grids · no observed population data'
+  extra_navbar: 'Real native population excerpts · Greater Lagos'
 repository:
   url: https://github.com/jltobias/JupyterLite-Population-Data-Comparison
   branch: main

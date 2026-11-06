@@ -1,43 +1,31 @@
 # Method and import contract
 
-## Count aggregation
+## Native counts and spherical overlap
 
-For each nonoverlapping count cell, estimate the people in the study rectangle as `cell population × spherical overlap area / spherical cell area`, then sum the contributions. The spherical area of a WGS84 longitude/latitude rectangle is proportional to `(east − west) × (sin(north) − sin(south))`, using radians. The sphere radius cancels in the fraction. This is a spherical approximation, not an ellipsoidal geodesic calculation.
+All accepted data store **people per cell**, never density. A rectangular comparison allocates `native_count × spherical_overlap_area / spherical_native_cell_area`, assuming uniform population within each cell. Spherical rectangle area is proportional to longitude width times the difference of sine latitude. The stable implementation also handles tiny polar rectangles. This assumption cannot recover within-cell settlement patterns.
 
-The method assumes uniform population inside a cell. It does not locate people precisely. No resampling changes the analytical values, and display zoom does not change native cell size. Inputs must already be counts in **people/cell**; density is unsupported until converted with the appropriate area and source semantics.
+Regular grids store north-up row-major values, native origin, spacing and dimensions. Only intersecting native rows/columns are visited. Grids retain their different offsets; no common-grid resampling occurs. Each grid has at most 262,144 cells, with at most 32,767 pixels on either display axis. The original nonoverlapping rectangular-cell API remains available with a 2,000-cell limit. Every accepted cell must have representable positive bounds and area.
 
-The tile-free viewer uses Leaflet's EPSG:4326 equirectangular display, including polar latitudes up to ±90°. This display stretches area with latitude; the calculations use spherical areas independently of map appearance.
+Coverage is the spherical fraction of the analysis rectangle containing numeric source cells. Numeric zero counts contribute coverage. Null is NoData and contributes neither population nor numeric-cell coverage. No numeric overlap returns `None` / `null`, displayed as “No coverage.” `prepared_coverage` separately reports geometric overlap with the available grid rectangle, so an area extending outside the excerpt is explicit. Tiny floating-point coverage excess is clamped to one.
 
-Coverage is the summed spherical overlap area with data divided by the spherical study area. Valid zero-count cells contribute coverage. Absent cells represent NoData; when no cells intersect, population is `null` in JSON and blank in CSV, while coverage is zero. The UI says **No coverage**. Areas outside the grids can have partial coverage. Counts and coverage are exported at full numeric precision; display values are rounded.
+## Interpreting the four products
 
-The shared rectangle `[120.1, 14.1, 120.3, 14.3]` yields **400, 400, 800, 240** for the four bundled scenarios. The complete first three grids each sum to 1,600 over the full study rectangle; the fourth contains 960 people over its available cells. Its default-area coverage is approximately 75%, with the exact value accounting for latitude.
+WorldPop Global2 is a January 1, 2025 residential estimate and R2025A v1 is an alpha public release. GRID3 Nigeria is scaled to July 2025 and uses a different model and inputs. Within Nigeria its NaN means mapped unsettled; outside the national boundary it denotes outside coverage. These remain nulls rather than zero counts. LandScan Global 2020 describes ambient population averaged over 24 hours. GHS-POP 2025 is a residential projection using GPWv4.11 demographics and GHSL built-up information; it declares no NoData, so zero, including water, is numeric coverage.
+
+WorldPop and GRID3 share producers/inputs. GHS-POP shares GPW demographic inputs. Product agreement is not independent accuracy validation. The same nominal year does not imply equal reference dates, concepts, inputs or uncertainty. Coverage is not a confidence measure.
 
 ## Import contract
 
-<a href="../data/import-example.geojson">Download a complete synthetic example</a>. Imported files stay in the current browser session and are not uploaded to a server.
+The viewer's local GeoTIFF import runs in a cancellable Web Worker. Edit and confirm source metadata for your chosen file. Templates provide citations; they do not independently identify the uploaded file. Bundled excerpt receipts and verification claims are removed from user imports. Fresh declarations retain filename, file size, modification time, source geometry, selected native window, TIFF metadata and the reader/method. The browser reads file slices and intersecting native decode blocks; no server receives the file.
 
-Use a GeoJSON `FeatureCollection` in WGS84 longitude/latitude with a top-level `metadata` object. Every feature must contain one axis-aligned `Polygon` rectangle: one ring, five two-dimensional positions with the first repeated at the end, four distinct corners, and no crossing edges. Features have numeric `properties.population` counts. Cells may share edges but must not overlap. Omit NoData cells; a numeric zero is valid coverage.
+Accepted TIFFs are little-endian, single-band, PixelIsArea, explicitly EPSG:4326 and north-up with positive pixel scale and one tiepoint. Counts must be stored directly, with finite nonnegative values or a declared NoData sentinel (including NaN). Unsupported CRS, rotation/shear, PixelIsPoint, scale/offset, internal masks, alpha/extra samples, SubIFDs, multiple primary images and unsupported sample encodings are rejected. External `.msk` sidecars cannot be read; declare that the file has none. Overviews in the main IFD chain are inspected but never used for calculations. Sparse blocks retain declared NoData, including NaN.
 
-The import limit is **2 MB**, **2,000 cells per layer**, at most **5 degrees per cell in either direction**, and **16 layers in a browser session**. Coordinates must be finite and within longitude −180…180 and latitude −90…90. West must be less than east; south less than north. Antimeridian-crossing cells, holes, multipolygons, CRS overrides, negative/nonfinite counts, and density inputs are rejected. Invalid imports and area inputs leave existing valid analysis intact.
+Limits: file 2 GiB; native output 262,144 cells, with at most 32,767 pixels on either display axis; metadata 8 MiB, 1,024 entries per directory and 32 directories; each decode block 16 million pixels; selected compressed blocks 64 MiB; selected decoded blocks 128 MiB. Only uncompressed, LZW and Deflate counts are accepted, with bounded decompression. Choose a smaller area or prepare a tiled excerpt when a file exceeds these limits. No resampling is used to fit a limit. Cancellation terminates the worker; errors retain valid layers and analysis.
 
-Metadata fields (all required):
+Small rectangular GeoJSON imports remain supported: WGS84 FeatureCollection without a CRS override, one closed axis-aligned Polygon ring per feature, numeric `properties.population`, required metadata, at most 2 MB and 2,000 nonoverlapping cells, each no more than 5° wide/high. A labelled synthetic fixture is supplied only for this lesson/test contract.
 
-| Field | Value |
-| --- | --- |
-| `id`, `title`, `version` | Nonempty strings; id must be unique in the session |
-| `source`, `citation` | Actual creator/distributor and full source citation |
-| `license`, `license_url` | Exact applicable license and its reference |
-| `year` | Integer reference year from 0 to 9999 |
-| `synthetic` | Boolean, `true` for invented data |
-| `units`, `crs` | Exactly `people/cell`, `EPSG:4326` |
-| `resolution` | Native cell support description |
-| `population_concept` | Residential, ambient, or other declared concept |
-| `allocation`, `census_vintage` | Source method and actual census vintage, or explicit non-applicability |
+## Reproducibility and exports
 
-Add retrieval and publication dates, notices, provider credits, checksums, and processing history as additional metadata fields. Required text fields are limited to 4,000 characters. The importer validates structure, not the authenticity or legal sufficiency of supplied provenance. Metadata are displayed as text. Full metadata are preserved in JSON results, the CSV `metadata_json` field, and the downloaded chart SVG's description. The CSV's core columns are convenient for spreadsheets, and formula-like metadata are escaped to avoid accidental evaluation.
+`data/population.json` contains canonical lossless count/null arrays. `data/real/` contains TIFF excerpts, acquisition receipts, native transforms, source/output hashes, STAC metadata, independent source expectations and ORNL validation receipts. `scripts/prepare_population.py` explicitly acquires/extracts sources with optional NumPy/rasterio dependencies; normal builds never refresh sources. Input cache files stay outside publication.
 
-## Interpretation and exports
-
-Do not interpret disagreement as a confidence interval. Compare year, concept, census inputs, coverage, allocation methods and appropriate spatial support. The synthetic daytime scenario represents a different concept; the incomplete scenario has missing coverage. These are intentional examples of why raw totals alone do not establish accuracy.
-
-JSON and CSV include source, citation, exact license, synthetic status, reference year, active bounds, method, population estimate, coverage, and intersected-cell count. JSON and CSV retain all optional metadata. Chart SVGs embed the same full result in their description for standalone reuse. Keep that metadata and all producer notices with derived files.
+JSON and CSV retain full metadata, grid identity, active bounds, counts, coverage, native cell count and method. CSV's `metadata_json` preserves extra notices. SVG embeds complete results in its description and displays source credits, license, dates/concepts and coverage. Display rounding does not affect export precision. NoData remains distinct from zero in all formats.

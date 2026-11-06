@@ -1,0 +1,134 @@
+{
+  "landscan2020": {
+    "path": "C:\\DATA\\JupyterLite-Population-Data-Comparison\\_build\\research\\landscan2020_greater_lagos.tif",
+    "sha256": "486eda4d2d0ac4e92fded4acc7dd8a9a2467bfd403b3659cfe6dba2f2a908f26",
+    "bbox_requested": [
+      3.2,
+      6.35,
+      3.6,
+      6.7
+    ],
+    "bounds": [
+      3.199999999999278,
+      6.3499999999996275,
+      3.5999999999992767,
+      6.699999999999626
+    ],
+    "transform_affine": [
+      0.0083333333333333,
+      0.0,
+      3.199999999999278,
+      0.0,
+      -0.0083333333333333,
+      6.699999999999626
+    ],
+    "width": 48,
+    "height": 42,
+    "dtype": "int32",
+    "nodata": -2147483647.0,
+    "valid_cells": 1478,
+    "masked_cells": 538,
+    "nonfinite_cells": 0,
+    "sum": 18551545.0,
+    "min": 0.0,
+    "max": 109265.0,
+    "product": "LandScan Global 2020",
+    "year": 2020,
+    "units": "Ambient people per native 30 arcsecond cell",
+    "license": "CC BY 4.0",
+    "license_url": "https://landscan.ornl.gov/licensing",
+    "citation": "Rose, A., McKee, J., Sims, K., Bright, E., Reith, A., and Urban, M. (2021). LandScan Global 2020. Oak Ridge National Laboratory. https://doi.org/10.48690/1523378",
+    "source_asset": "https://huggingface.co/datasets/Daksh17440/global_population_data/resolve/404bde4c5b56347cbce2e1824890246872a89aef/landscan-global-2020.tif",
+    "mirror_commit": "404bde4c5b56347cbce2e1824890246872a89aef",
+    "source_asset_sha256_published_by_mirror": "9f71990ec4ef6208ccdc25b75ba6a395f99dc367261f60c2cbca153023271e33",
+    "source_asset_sha256_locally_verified": false,
+    "source_bytes_total": 97499983,
+    "ranges": [
+      {
+        "start": 0,
+        "end": 1048575,
+        "status": 206,
+        "etag": "\"4b1345e2ab7223dabf9e634369fb57ccc3c355aff883f62f7f17b70f83335526\"",
+        "content_range": "bytes 0-1048575/97499983",
+        "access_control_allow_origin": "*"
+      },
+      {
+        "start": 69031032,
+        "end": 69257155,
+        "status": 206,
+        "etag": "\"4b1345e2ab7223dabf9e634369fb57ccc3c355aff883f62f7f17b70f83335526\"",
+        "content_range": "bytes 69031032-69257155/97499983",
+        "access_control_allow_origin": "*"
+      },
+      {
+        "start": 69257164,
+        "end": 69543185,
+        "status": 206,
+        "etag": "\"4b1345e2ab7223dabf9e634369fb57ccc3c355aff883f62f7f17b70f83335526\"",
+        "content_range": "bytes 69257164-69543185/97499983",
+        "access_control_allow_origin": "*"
+      }
+    ],
+    "bytes_downloaded": 1560722,
+    "retrieval_date": "2026-11-06",
+    "tls_verification": "Windows ROOT certificates added to certifi CA bundle; certificate chain and hostname verification enabled.",
+    "validation": {
+      "one_cell_value_from_mirror": 73830,
+      "one_cell_sum_from_ornl_stats": 73830,
+      "one_cell_receipt": "landscan2020_official_stats.json",
+      "greater_lagos_receipt": "landscan2020_greater_lagos_official_stats.json",
+      "greater_lagos_subset_sum": 18551545.0,
+      "greater_lagos_official_sum": 18551545.0,
+      "greater_lagos_sum_equal": true
+    }
+  },
+  "ghspop2025": {
+    "path": "C:\\DATA\\JupyterLite-Population-Data-Comparison\\_build\\research\\ghspop2025_greater_lagos.tif",
+    "sha256": "76b2f98bb7b4abefbe58681b382827a89769bb44eb9e9b3959fe7dfd8be7814c",
+    "bbox_requested": [
+      3.2,
+      6.35,
+      3.6,
+      6.7
+    ],
+    "bounds": [
+      3.192083343086763,
+      6.349583510680855,
+      3.600416674802782,
+      6.7079168425720415
+    ],
+    "transform_affine": [
+      0.008333333300326923,
+      0.0,
+      3.192083343086763,
+      0.0,
+      -0.00833333329979504,
+      6.7079168425720415
+    ],
+    "width": 49,
+    "height": 43,
+    "dtype": "float64",
+    "nodata": null,
+    "valid_cells": 2107,
+    "masked_cells": 0,
+    "nonfinite_cells": 0,
+    "sum": 11842522.187477237,
+    "min": 0.0,
+    "max": 101076.63225982666,
+    "product": "GHS-POP R2023A E2025 WGS84 30 arcsecond V1.0",
+    "year": 2025,
+    "units": "Residential people per native 30 arcsecond cell",
+    "definition": "Residential population projection to 2025, derived from CIESIN GPWv4.11 and disaggregated using GHSL built-up distribution, volume, and class.",
+    "license": "CC BY 4.0",
+    "license_url": "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/copyright.txt",
+    "citation": "Schiavina, M., Freire, S., Carioli, A., and MacManus, K. (2023). GHS-POP R2023A: GHS population grid multitemporal (1975-2030). European Commission, Joint Research Centre. https://doi.org/10.2905/2FF68A52-5B5B-4A22-8F40-C41DA8332CFE",
+    "source_asset": "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/GHS_POP_E2025_GLOBE_R2023A_4326_30ss/V1-0/tiles/GHS_POP_E2025_GLOBE_R2023A_4326_30ss_V1_0_R9_C19.zip",
+    "source_archive_path": "C:\\DATA\\JupyterLite-Population-Data-Comparison\\_build\\research\\GHS_POP_E2025_GLOBE_R2023A_4326_30ss_V1_0_R9_C19.zip",
+    "source_archive_sha256": "1762b067b5c807dbe340b523c943d21003810018b34c00138c1ffac48e455f8b",
+    "source_raster_path": "C:\\DATA\\JupyterLite-Population-Data-Comparison\\_build\\research\\ghsl2025\\GHS_POP_E2025_GLOBE_R2023A_4326_30ss_V1_0_R9_C19.tif",
+    "source_raster_sha256": "ff4c7e9ffe026143904d939cf0884edef967e799a5590dc4a71a7e682550f1e2",
+    "bytes_downloaded": 4512150,
+    "retrieval_date": "2026-11-06",
+    "tls_verification": "Certificate chain and hostname verification enabled."
+  }
+}

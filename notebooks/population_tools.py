@@ -1,6 +1,7 @@
 """Dependency-free teaching calculations shared by CPython and JupyterLite.
 
-All bundled cells are invented. Rectangular counts are allocated uniformly
+Real source excerpts and explicitly synthetic teaching fixtures share this API.
+Rectangular counts are allocated uniformly
 within each cell using spherical area fractions; this is an assumption, not a
 measurement of where people live inside the cell.
 """
@@ -13,6 +14,7 @@ from pathlib import Path
 METHOD = "Spherical area-weighted count allocation; uniform population within each rectangular cell"
 REQUIRED_METADATA = ("id", "title", "source", "citation", "license", "license_url", "year", "version", "synthetic", "units", "crs", "resolution", "population_concept", "allocation", "census_vintage")
 MAX_CELLS = 2000
+MAX_GRID_CELLS = 262144
 
 
 def finite_number(value):
@@ -97,6 +99,27 @@ def validate_metadata(metadata):
 
 def validate_layer(layer):
     validate_metadata(layer.get("metadata"))
+    if "grid" in layer:
+        g = layer["grid"]
+        if not isinstance(g, dict) or any(not isinstance(g.get(k), int) or isinstance(g[k], bool) or g[k] < 1 for k in ("width", "height")) or g["width"] * g["height"] > MAX_GRID_CELLS:
+            raise ValueError("A regular grid requires positive dimensions and at most 262144 cells.")
+        if any(not finite_number(g.get(k)) for k in ("west", "north", "dx", "dy")) or not 0 < g["dx"] <= 5 or not 0 < g["dy"] <= 5:
+            raise ValueError("Grid requires finite north-up coordinates and positive cell sizes of at most 5 degrees.")
+        validate_bounds(grid_bounds(g))
+        widths = [g["west"]+(x+1)*g["dx"] - (g["west"]+x*g["dx"]) for x in range(g["width"])]
+        if min(widths) <= 0:
+            raise ValueError("Native cell bounds must remain representable at floating-point precision.")
+        for y in range(g["height"]):
+            validate_bounds([g["west"], g["north"]-(y+1)*g["dy"], g["west"]+min(widths), g["north"]-y*g["dy"]])
+        if not isinstance(g.get("values"), list) or len(g["values"]) != g["width"] * g["height"]:
+            raise ValueError("Grid values must be a row-major array matching its dimensions.")
+        if any(v is not None and (not finite_number(v) or v < 0) for v in g["values"]):
+            raise ValueError("Grid values must be nonnegative finite counts or null NoData.")
+        if not math.isfinite(sum(v or 0 for v in g["values"])):
+            raise ValueError("Grid population sum exceeds finite numeric range.")
+        if "cells" in layer:
+            raise ValueError("Provide either a regular grid or rectangular cells.")
+        return layer
     cells = layer.get("cells")
     if not isinstance(cells, list) or not 1 <= len(cells) <= MAX_CELLS:
         raise ValueError(f"A layer must have between 1 and {MAX_CELLS} cells.")
@@ -113,6 +136,34 @@ def validate_layer(layer):
     if not finite_number(sum(cell["population"] for cell in cells)):
         raise ValueError("Layer population sum exceeds finite numeric range.")
     return layer
+
+
+def grid_bounds(g):
+    return [g["west"], g["north"] - g["height"] * g["dy"], g["west"] + g["width"] * g["dx"], g["north"]]
+
+
+def layer_bounds(layer):
+    if "grid" in layer:
+        return grid_bounds(layer["grid"])
+    cells = layer["cells"]
+    return [min(c["bounds"][0] for c in cells), min(c["bounds"][1] for c in cells), max(c["bounds"][2] for c in cells), max(c["bounds"][3] for c in cells)]
+
+
+def native_window(g, bounds):
+    return [max(0, min(g["width"], math.floor((bounds[0]-g["west"])/g["dx"]))), max(0, min(g["height"], math.floor((g["north"]-bounds[3])/g["dy"]))), max(0, min(g["width"], math.ceil((bounds[2]-g["west"])/g["dx"]))), max(0, min(g["height"], math.ceil((g["north"]-bounds[1])/g["dy"])))]
+
+
+def iter_cells(layer, bounds=None):
+    if "grid" not in layer:
+        yield from layer["cells"]
+        return
+    g = layer["grid"]
+    x0, y0, x1, y1 = native_window(g, bounds or grid_bounds(g))
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            value = g["values"][y*g["width"]+x]
+            if value is not None:
+                yield {"population": value, "bounds": [g["west"]+x*g["dx"], g["north"]-(y+1)*g["dy"], g["west"]+(x+1)*g["dx"], g["north"]-y*g["dy"]]}
 
 
 def import_geojson(document):
@@ -155,20 +206,22 @@ def compare(layers, bounds):
     results = []
     for layer in layers:
         total, covered, intersected = 0.0, 0.0, 0
-        for cell in layer["cells"]:
+        for cell in iter_cells(layer, bounds):
             overlap = intersection(bounds, cell["bounds"])
             if overlap:
                 overlap_area = area(overlap)
                 total += cell["population"] * min(1.0, overlap_area / area(cell["bounds"]))
                 covered += overlap_area
                 intersected += 1
-        results.append({"metadata": dict(layer["metadata"]), "population": total if intersected else None, "coverage": min(1.0, covered / area(bounds)), "intersected_cells": intersected, "bounds": list(bounds), "method": METHOD})
+        support = intersection(bounds, layer_bounds(layer))
+        grid = {k: layer["grid"][k] for k in ("width", "height", "west", "north", "dx", "dy")} if "grid" in layer else None
+        results.append({"metadata": json.loads(json.dumps(layer["metadata"])), "population": total if intersected else None, "coverage": min(1.0, covered / area(bounds)), "intersected_cells": intersected, "bounds": list(bounds), "method": METHOD, "grid": grid, "prepared_coverage": min(1, area(support)/area(bounds)) if support else 0})
     return results
 
 
 def export_csv(results):
     output = io.StringIO(newline="")
-    fields = [*REQUIRED_METADATA, "population", "coverage", "intersected_cells", "bounds", "method", "metadata_json"]
+    fields = [*REQUIRED_METADATA, "population", "coverage", "intersected_cells", "bounds", "method", "grid", "prepared_coverage", "metadata_json"]
     writer = csv.DictWriter(output, fieldnames=fields)
     writer.writeheader()
     for result in results:
@@ -176,6 +229,7 @@ def export_csv(results):
         row["metadata_json"] = json.dumps(result["metadata"], ensure_ascii=False)
         row = {key: row[key] for key in fields}
         row["bounds"] = json.dumps(row["bounds"])
+        row["grid"] = json.dumps(row["grid"])
         # Spreadsheet programs must not interpret supplied metadata as formulas.
         row = {k: "'" + v if isinstance(v, str) and v.lstrip().startswith(("=", "+", "-", "@")) else v for k, v in row.items()}
         writer.writerow(row)
@@ -184,4 +238,9 @@ def export_csv(results):
 
 def load_demo(path="demo.json"):
     """The build places the canonical demo next to all Lab notebooks."""
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def load_population(path="population.json"):
+    """Load the canonical native-pixel real population excerpts."""
     return json.loads(Path(path).read_text(encoding="utf-8"))

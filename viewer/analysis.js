@@ -1,6 +1,7 @@
 /* Dependency-free counterpart to notebooks/population_tools.py. */
 export const METHOD = 'Spherical area-weighted count allocation; uniform population within each rectangular cell';
 export const METADATA = ['id', 'title', 'source', 'citation', 'license', 'license_url', 'year', 'version', 'synthetic', 'units', 'crs', 'resolution', 'population_concept', 'allocation', 'census_vintage'];
+export const MAX_GRID_CELLS = 262144;
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 export function validateBounds(bounds) {
   if (!Array.isArray(bounds) || bounds.length !== 4 || !bounds.every(finite)) throw Error('Bounds need four finite numbers: west, south, east, north.');
@@ -28,6 +29,22 @@ export function validateLayer(layer) {
   }
   if (typeof metadata.synthetic !== 'boolean' || !Number.isInteger(metadata.year) || metadata.year<0 || metadata.year>9999) throw Error('Provide a boolean synthetic status and an integer year (0–9999).');
   if (metadata.units!=='people/cell' || metadata.crs!=='EPSG:4326') throw Error('Only people/cell counts in EPSG:4326 are supported; convert density before import.');
+  if (Object.hasOwn(layer,'grid')) {
+    const g=layer.grid;
+    if(!g||typeof g!=='object'||Array.isArray(g))throw Error('Grid must be an object.');
+    if (!Number.isInteger(g.width)||!Number.isInteger(g.height)||g.width<1||g.height<1||g.width*g.height>MAX_GRID_CELLS) throw Error(`A regular grid requires positive dimensions and at most ${MAX_GRID_CELLS} cells.`);
+    if (![g.west,g.north,g.dx,g.dy].every(finite)||g.dx<=0||g.dy<=0||g.dx>5||g.dy>5) throw Error('Grid requires finite north-up coordinates and positive cell sizes of at most 5 degrees.');
+    validateBounds(gridBounds(g));
+    let minWidth=Infinity;
+    for(let x=0;x<g.width;x++){const w=g.west+x*g.dx,e=g.west+(x+1)*g.dx;if(!(e>w))throw Error('Native cell bounds must remain representable at floating-point precision.');minWidth=Math.min(minWidth,e-w);}
+    for(let y=0;y<g.height;y++)validateBounds([g.west,g.north-(y+1)*g.dy,g.west+minWidth,g.north-y*g.dy]);
+    if (!Array.isArray(g.values)||g.values.length!==g.width*g.height) throw Error('Grid values must be a row-major array matching its dimensions.');
+    let sum=0;
+    for (const value of g.values) {if(value!==null&&(!finite(value)||value<0))throw Error('Grid values must be nonnegative finite counts or null NoData.');sum+=value||0;}
+    if(!finite(sum))throw Error('Grid population sum exceeds finite numeric range.');
+    if(Object.hasOwn(layer,'cells'))throw Error('Provide either a regular grid or rectangular cells.');
+    return layer;
+  }
   if (!Array.isArray(layer.cells) || !layer.cells.length || layer.cells.length>2000) throw Error('A layer needs between 1 and 2000 cells.');
   layer.cells.forEach((cell,i)=>{
     const b=validateBounds(cell.bounds);
@@ -74,15 +91,45 @@ export function compare(layers,bounds) {
   validateBounds(bounds);
   return layers.map(layer=>{
     let total=0,covered=0,intersected=0;
-    layer.cells.forEach(cell=>{
+    for (const cell of iterateCells(layer,bounds)) {
       const overlap=intersection(bounds,cell.bounds);
       if (overlap) { const a=area(overlap); total+=cell.population*Math.min(1,a/area(cell.bounds)); covered+=a; intersected++; }
-    });
-    return {metadata:{...layer.metadata},population:intersected?total:null,coverage:Math.min(1,covered/area(bounds)),intersected_cells:intersected,bounds:bounds.slice(),method:METHOD};
+    }
+    const support=intersection(bounds,layerBounds(layer));
+    return {metadata:structuredClone(layer.metadata),population:intersected?total:null,coverage:Math.min(1,covered/area(bounds)),intersected_cells:intersected,bounds:bounds.slice(),method:METHOD,grid:layer.grid?gridIdentity(layer.grid):null,prepared_coverage:support?Math.min(1,area(support)/area(bounds)):0};
   });
 }
+export function gridBounds(g){return [g.west,g.north-g.height*g.dy,g.west+g.width*g.dx,g.north];}
+export function gridIdentity(g){return Object.fromEntries(['width','height','west','north','dx','dy'].map(key=>[key,g[key]]));}
+export function layerBounds(layer){
+  if(layer.grid)return gridBounds(layer.grid);
+  return layer.cells.reduce((b,c)=>[Math.min(b[0],c.bounds[0]),Math.min(b[1],c.bounds[1]),Math.max(b[2],c.bounds[2]),Math.max(b[3],c.bounds[3])],[Infinity,Infinity,-Infinity,-Infinity]);
+}
+export function nativeWindow(g,bounds){
+  return [Math.max(0,Math.min(g.width,Math.floor((bounds[0]-g.west)/g.dx))),Math.max(0,Math.min(g.height,Math.floor((g.north-bounds[3])/g.dy))),Math.max(0,Math.min(g.width,Math.ceil((bounds[2]-g.west)/g.dx))),Math.max(0,Math.min(g.height,Math.ceil((g.north-bounds[1])/g.dy)))];
+}
+export function* iterateCells(layer,bounds=layerBounds(layer)){
+  if(!layer.grid){yield* layer.cells;return;}
+  const g=layer.grid,[x0,y0,x1,y1]=nativeWindow(g,bounds);
+  for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+    const population=g.values[y*g.width+x];
+    if(population!==null)yield {bounds:[g.west+x*g.dx,g.north-(y+1)*g.dy,g.west+(x+1)*g.dx,g.north-y*g.dy],population};
+  }
+}
+export function inspectCell(layer,lon,lat){
+  if(!layer.grid)return layer.cells.find(c=>lon>=c.bounds[0]&&lon<c.bounds[2]&&lat>c.bounds[1]&&lat<=c.bounds[3])||null;
+  const g=layer.grid,[w,s,e,n]=gridBounds(g);
+  if(!finite(lon)||!finite(lat)||lon<w||lon>=e||lat<=s||lat>n)return null;
+  let x=Math.max(0,Math.min(g.width-1,Math.floor((lon-w)/g.dx))),y=Math.max(0,Math.min(g.height-1,Math.floor((n-lat)/g.dy)));
+  // Quotients can round across exact grid lines; compare the actual stored-grid edges.
+  while(x>0&&lon<g.west+x*g.dx)x--;
+  while(x+1<g.width&&lon>=g.west+(x+1)*g.dx)x++;
+  while(y>0&&lat>g.north-y*g.dy)y--;
+  while(y+1<g.height&&lat<=g.north-(y+1)*g.dy)y++;
+  return {bounds:[g.west+x*g.dx,g.north-(y+1)*g.dy,g.west+(x+1)*g.dx,g.north-y*g.dy],population:g.values[y*g.width+x],column:x,row:y};
+}
 export function exportCSV(results) {
-  const fields=[...METADATA,'population','coverage','intersected_cells','bounds','method','metadata_json'];
+  const fields=[...METADATA,'population','coverage','intersected_cells','bounds','method','grid','prepared_coverage','metadata_json'];
   const quote=value=>{
     let text=value===null?'':typeof value==='object'?JSON.stringify(value):String(value);
     if (/^\s*[=+\-@]/.test(text)) text="'"+text;

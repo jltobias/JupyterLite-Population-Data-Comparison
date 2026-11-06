@@ -1,0 +1,108 @@
+[
+  {
+    "payload": {
+      "dataset": "global",
+      "year": 2020,
+      "geometry": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    3.374999999999278,
+                    6.524999999999627
+                  ],
+                  [
+                    3.383333333332611,
+                    6.524999999999627
+                  ],
+                  [
+                    3.383333333332611,
+                    6.53333333333296
+                  ],
+                  [
+                    3.374999999999278,
+                    6.53333333333296
+                  ],
+                  [
+                    3.374999999999278,
+                    6.524999999999627
+                  ]
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "status": 200,
+    "response": "{\"type\": \"Feature\", \"geometry\": {\"type\": \"Polygon\", \"coordinates\": [[[3.375, 6.525], [3.383333, 6.525], [3.383333, 6.533333], [3.375, 6.533333], [3.375, 6.525]]]}, \"properties\": {\"min\": 73830.0, \"max\": 73830.0, \"mean\": 73830.0, \"count\": 1, \"sum\": 73830.0, \"area\": 0.8549760807580375, \"density\": 86353.2929886658}}",
+    "request_provenance": {
+      "endpoint": "https://hm52ct46i7.execute-api.us-east-1.amazonaws.com/prod/stats",
+      "method": "POST",
+      "content_type": "application/json",
+      "retrieval_date": "2026-11-06",
+      "original_request_time_utc": null,
+      "time_note": "Original request time was not retained; no timestamp is inferred."
+    },
+    "reproduce_command": "python -c \"import json,urllib.request; r=json.load(open('data/real/landscan2020_official_stats.json',encoding='utf-8')); r=r[0]; q=urllib.request.Request('https://hm52ct46i7.execute-api.us-east-1.amazonaws.com/prod/stats',data=json.dumps(r['payload']).encode(),headers={'Content-Type':'application/json'},method='POST'); print(urllib.request.urlopen(q).read().decode())\""
+  },
+  {
+    "payload": {
+      "dataset": "global",
+      "year": 2020,
+      "geometry": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    3.36,
+                    6.5
+                  ],
+                  [
+                    3.39,
+                    6.5
+                  ],
+                  [
+                    3.39,
+                    6.53
+                  ],
+                  [
+                    3.36,
+                    6.53
+                  ],
+                  [
+                    3.36,
+                    6.5
+                  ]
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "status": 200,
+    "response": "{\"type\": \"Feature\", \"geometry\": {\"type\": \"Polygon\", \"coordinates\": [[[3.36, 6.5], [3.39, 6.5], [3.39, 6.53], [3.36, 6.53], [3.36, 6.5]]]}, \"properties\": {\"min\": 20608.0, \"max\": 73830.0, \"mean\": 48042.875, \"count\": 16, \"sum\": 768686.0, \"area\": 11.08080311405765, \"density\": 69370.96454902328}}",
+    "request_provenance": {
+      "endpoint": "https://hm52ct46i7.execute-api.us-east-1.amazonaws.com/prod/stats",
+      "method": "POST",
+      "content_type": "application/json",
+      "retrieval_date": "2026-11-06",
+      "original_request_time_utc": null,
+      "time_note": "Original request time was not retained; no timestamp is inferred."
+    },
+    "reproduce_command": "python -c \"import json,urllib.request; r=json.load(open('data/real/landscan2020_official_stats.json',encoding='utf-8')); r=r[1]; q=urllib.request.Request('https://hm52ct46i7.execute-api.us-east-1.amazonaws.com/prod/stats',data=json.dumps(r['payload']).encode(),headers={'Content-Type':'application/json'},method='POST'); print(urllib.request.urlopen(q).read().decode())\""
+  }
+]

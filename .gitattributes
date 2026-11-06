@@ -2,3 +2,10 @@
 *.png binary
 # Keep the pinned upstream distribution byte-exact; review its version and license.
 viewer/vendor/leaflet/leaflet.js -text -diff
+data/population.json -diff
+*.tif binary
+viewer/vendor/geotiff/geotiff-3.0.5.js -text -diff
+
+# Retain upstream notice formatting, including original trailing spaces.
+data/real/ghsl_copyright.txt -whitespace
+viewer/vendor/geotiff/LICENSE-geotiff -whitespace
