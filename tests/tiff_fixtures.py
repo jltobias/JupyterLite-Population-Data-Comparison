@@ -11,7 +11,7 @@ def literal_lzw(raw):
     return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8))
 
 
-def tiff(values=(0., float("nan"), 10., 20.), *, width=2, height=2, epsg=4326, nodata="nan", metadata=None, kind=0, sparse=False, compression=1, bomb=False, big_endian=False, loop=False, large_entries=False, tile_width=None, tile_height=None, rows_per_strip=None, dx=.1, dy=.1):
+def tiff(values=(0., float("nan"), 10., 20.), *, width=2, height=2, epsg=4326, nodata="nan", metadata=None, kind=0, sparse=False, compression=1, bomb=False, big_endian=False, loop=False, large_entries=False, tile_width=None, tile_height=None, rows_per_strip=None, dx=.1, dy=.1, west=10, north=20):
     def pack(fmt, *args):
         return struct.pack("<" + fmt, *args)
     keys = [1, 1, 0, 3, 1024, 0, 1, 2, 1025, 0, 1, 1, 2048, 0, 1, epsg]
@@ -23,7 +23,7 @@ def tiff(values=(0., float("nan"), 10., 20.), *, width=2, height=2, epsg=4326, n
         raw = zlib.compress(raw)
     elif compression == 5:
         raw = literal_lzw(raw)
-    tags = [(254,4,pack("I",kind)), (256,4,pack("I",width)), (257,4,pack("I",height)), (258,3,pack("H",32)), (259,3,pack("H",compression)), (262,3,pack("H",1)), (273,4,pack("II",0,0) if sparse else pack("I",0)), (277,3,pack("H",1)), (278,4,pack("I",rows_per_strip if rows_per_strip is not None else 1 if sparse else height)), (279,4,pack("II",0,8) if sparse else pack("I",len(raw))), (284,3,pack("H",1)), (339,3,pack("H",3)), (33550,12,pack("ddd",dx,dy,0)), (33922,12,pack("dddddd",0,0,0,10,20,0)), (34735,3,pack("H"*len(keys),*keys))]
+    tags = [(254,4,pack("I",kind)), (256,4,pack("I",width)), (257,4,pack("I",height)), (258,3,pack("H",32)), (259,3,pack("H",compression)), (262,3,pack("H",1)), (273,4,pack("II",0,0) if sparse else pack("I",0)), (277,3,pack("H",1)), (278,4,pack("I",rows_per_strip if rows_per_strip is not None else 1 if sparse else height)), (279,4,pack("II",0,8) if sparse else pack("I",len(raw))), (284,3,pack("H",1)), (339,3,pack("H",3)), (33550,12,pack("ddd",dx,dy,0)), (33922,12,pack("dddddd",0,0,0,west,north,0)), (34735,3,pack("H"*len(keys),*keys))]
     if tile_width is not None or tile_height is not None:
         tags = [(324 if tag == 273 else 325 if tag == 279 else tag, kind_, value) for tag,kind_,value in tags if tag != 278]
         tags.extend([(322,4,pack('I',width if tile_width is None else tile_width)),(323,4,pack('I',height if tile_height is None else tile_height))])

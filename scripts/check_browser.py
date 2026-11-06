@@ -5,6 +5,8 @@ import csv
 import hashlib
 import io
 import json
+import re
+import struct
 import sys
 import threading
 import xml.etree.ElementTree as ET
@@ -23,6 +25,53 @@ from tiff_fixtures import tiff
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def send_head(self):
+        fixture = urlsplit(self.path).path.startswith(PREFIX+"__range__/")
+        path = Path(self.translate_path(self.path))
+        if not fixture and (not self.headers.get("Range") or not path.is_file()):
+            return super().send_head()
+        mode = path.name if fixture else "normal"
+        content = tiff(west=-74.1,north=40.9,dx=.15,dy=.15) if fixture else None
+        size = len(content) if fixture else path.stat().st_size
+        match = re.fullmatch(r"bytes=(\d+)-(\d+)", self.headers["Range"])
+        if not match or not 0 <= int(match[1]) <= int(match[2]) < size:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return None
+        start, end = map(int, match.groups())
+        self.send_response(200 if mode=="ignored.tif" else 206)
+        self.send_header("Content-Type", self.guess_type(str(path)))
+        self.send_header("Content-Range", "malformed" if mode=="malformed.tif" else f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(size if mode=="ignored.tif" else end-start+1))
+        self.send_header("Accept-Ranges", "bytes")
+        if mode!="no-identity.tif":
+            self.send_header("ETag", f'"{size:x}-{self.headers.get("Range") if mode=="changed.tif" else "fixture" if fixture else path.stat().st_mtime_ns}"')
+        if mode!="no-cors.tif":
+            self.send_header("Access-Control-Allow-Origin", "*")
+        if mode!="unexposed.tif":
+            self.send_header("Access-Control-Expose-Headers", "Content-Range, ETag, Last-Modified")
+        self.end_headers()
+        source = io.BytesIO(content) if fixture else path.open("rb")
+        source.seek(0 if mode=="ignored.tif" else start)
+        self._range_remaining = size if mode=="ignored.tif" else end-start if mode=="truncated.tif" else end-start+1
+        if mode=="truncated.tif":
+            self.close_connection=True
+        return source
+
+    def copyfile(self, source, outputfile):
+        remaining = getattr(self, "_range_remaining", None)
+        if remaining is None:
+            return super().copyfile(source, outputfile)
+        while remaining:
+            block = source.read(min(65536, remaining))
+            if not block:
+                break
+            outputfile.write(block)
+            remaining -= len(block)
+        self._range_remaining = None
+
     def translate_path(self, path):
         path = unquote(urlsplit(path).path)
         if not path.startswith(PREFIX):
@@ -46,6 +95,9 @@ class Links(HTMLParser):
 def check_publication():
     manifest = json.loads((SITE / "publication.json").read_text(encoding="utf-8"))
     assert manifest["launch_notebook"] == NOTEBOOKS[0]
+    canonical_catalog=(ROOT / "data/population-catalog.json").read_bytes()
+    assert canonical_catalog==(SITE / "data/population-catalog.json").read_bytes()
+    assert hashlib.sha256(canonical_catalog).hexdigest()==manifest["population_catalog_sha256"]
     for name, key in (("population.json", "population_sha256"), ("demo.json", "fixture_sha256")):
         canonical = (ROOT / "data" / name).read_bytes()
         assert canonical == (SITE / "data" / name).read_bytes() == (SITE / "lab/files" / name).read_bytes()
@@ -86,7 +138,7 @@ def download_text(page, button):
 def set_bounds(page, bounds):
     for key, value in zip(("west", "south", "east", "north"), bounds):
         page.locator("#"+key).fill(str(value))
-    page.locator("#compare").click()
+    page.locator("#compare-loaded").click()
 
 
 def worker(page, content, bounds=(10, 19.8, 10.2, 20)):
@@ -95,20 +147,245 @@ def worker(page, content, bounds=(10, 19.8, 10.2, 20)):
       return await new Promise(resolve=>{
         const w=new Worker(new URL('raster-worker.js',location.href));
         const timer=setTimeout(()=>{w.terminate();resolve({error:'Worker timeout'});},15000);
-        w.onmessage=({data})=>{clearTimeout(timer);w.terminate();resolve(data);};
+        w.onmessage=({data})=>{if(data.progress)return;clearTimeout(timer);w.terminate();resolve(data);};
         w.onerror=e=>{clearTimeout(timer);w.terminate();resolve({error:e.message});};
         w.postMessage({file:new File([bytes],'fixture.tif'),bounds});
       });
     }""", {"encoded":base64.b64encode(content).decode(), "bounds":list(bounds)})
 
 
+def tiff_entries(content):
+    offset=struct.unpack_from('<I',content,4)[0]
+    return {struct.unpack_from('<H',content,offset+2+12*i)[0]:offset+2+12*i for i in range(struct.unpack_from('<H',content,offset)[0])}
+
+
+def check_bbox_workflow(page, base):
+    page.goto(base+"viewer/index.html")
+    page.wait_for_function("window.populationViewer?.results.length===4")
+    snapshot = "JSON.stringify({bounds:populationViewer.bounds,results:populationViewer.results,images:[...document.querySelectorAll('.native-grid')].map(i=>i.src),views:populationViewer.maps.map(m=>[m.getCenter().lat,m.getCenter().lng,m.getZoom()])})"
+    initial = page.evaluate(snapshot)
+    initial_cells = page.evaluate("populationViewer.layers.slice(0,4).map(l=>l.grid.values.length)")
+    def draft(region):
+        for key, value in zip(("west","south","east","north"),region):
+            page.locator("#"+key).fill(str(value))
+    small = [3.32,6.48,3.40,6.56]
+    draft(small)
+    assert page.evaluate(snapshot)==initial
+    page.locator("#compare").click()
+    page.wait_for_function("b=>!populationViewer.loading&&JSON.stringify(populationViewer.bounds)===JSON.stringify(b)",arg=small)
+    assert all(a<b for a,b in zip(page.evaluate("populationViewer.layers.slice(0,4).map(l=>l.grid.values.length)"),initial_cells))
+    assert page.evaluate("populationViewer.maps.every(m=>{const a=m.latLngToContainerPoint([6.48,3.32]),b=m.latLngToContainerPoint([6.56,3.4]);return Math.abs(a.y-b.y)>150&&m.getBounds().contains([[6.48,3.32],[6.56,3.4]])})")
+    assert "selected compressed" in page.locator("#load-plan").inner_text()
+    expected = page.evaluate("populationViewer.results.map(r=>[r.population,r.coverage])")
+    # The identical snapped windows reuse pixels, while exact-box fractions change.
+    shifted=[v+1e-9 for v in small]
+    draft(shifted);page.locator("#compare").click()
+    page.wait_for_function("!populationViewer.loading")
+    assert "4/4 windows reused" in page.locator("#status").inner_text()
+    assert page.evaluate("populationViewer.results.map(r=>[r.population,r.coverage])")!=expected
+    assert page.evaluate("populationViewer.results.every(r=>r.metadata.acquisition.actual_bytes===0)")
+    assert page.evaluate("b=>populationViewer.results.every(r=>JSON.stringify(r.metadata.acquisition.requested_bounds)===JSON.stringify(b)&&r.metadata.acquisition.original_acquisition.actual_bytes>0)",small)
+    assert page.evaluate("b=>populationViewer.results.every(r=>JSON.stringify(r.metadata.comparison_context.requested_bounds)===JSON.stringify(b)&&!r.metadata.comparison_context.new_pixels_read)",shifted)
+    assert page.evaluate("populationViewer.cache.bytes<=16*1024*1024&&populationViewer.cache.entries<=16")
+    # A later source fails after earlier layers stage; nothing visible is replaced.
+    retained = page.evaluate(snapshot)
+    page.route("**/data/real/landscan-2020.tif",lambda route:route.abort())
+    draft([3.34,6.49,3.38,6.54]);page.locator("#compare").click()
+    page.wait_for_function("!populationViewer.loading")
+    assert page.evaluate(snapshot)==retained
+    assert "rejected" in page.locator("#error").inner_text()
+    page.unroute("**/data/real/landscan-2020.tif")
+    # A same-size decoding-field mutation cannot replace a valid comparison.
+    mutated=bytearray((ROOT/'data/real/worldpop-2025.tif').read_bytes())
+    struct.pack_into('<H',mutated,tiff_entries(mutated)[339]+8,1)
+    def changed_sample(route):
+        lo,hi=map(int,re.fullmatch(r'bytes=(\d+)-(\d+)',route.request.headers['range']).groups())
+        route.fulfill(status=206,headers={'Content-Range':f'bytes {lo}-{hi}/{len(mutated)}','ETag':'"changed-sample"','Content-Type':'image/tiff'},body=bytes(mutated[lo:hi+1]))
+    page.route('**/data/real/worldpop-2025.tif',changed_sample)
+    draft([3.356,6.506,3.376,6.526]);page.locator('#compare').click();page.wait_for_function('!populationViewer.loading')
+    assert page.evaluate(snapshot)==retained and 'pinned catalog' in page.locator('#error').inner_text()
+    page.unroute('**/data/real/worldpop-2025.tif')
+    # Simulate exhaustion in the preceding worker; the next worker issues no range.
+    next_requests=[]
+    observer=lambda request:next_requests.append(request.url) if request.url.endswith('/grid3-2025.tif') else None
+    page.on('request',observer)
+    page.evaluate("""()=>{window.nativeBudgetWorker=Worker;window.Worker=class extends nativeBudgetWorker{set onmessage(handler){super.onmessage=event=>{if(event.data.progress)event.data.progress.actual_bytes=128*1024*1024;handler(event);};}};}""")
+    draft([3.357,6.507,3.377,6.527]);page.locator('#compare').click();page.wait_for_function('!populationViewer.loading')
+    page.evaluate('()=>{window.Worker=window.nativeBudgetWorker;}')
+    page.remove_listener('request',observer)
+    assert not next_requests and page.evaluate(snapshot)==retained
+    assert 'remaining transfer budget' in page.locator('#error').inner_text()
+    # Cancel and edits terminate workers synchronously before any commit.
+    draft([3.345,6.495,3.385,6.545])
+    page.evaluate("document.getElementById('compare').click();document.getElementById('load-cancel').click()")
+    assert page.evaluate(snapshot)==retained
+    page.evaluate("document.getElementById('compare').click();const e=document.getElementById('west');e.value='3.346';e.dispatchEvent(new Event('input',{bubbles:true}))")
+    page.wait_for_timeout(200)
+    assert page.evaluate(snapshot)==retained and not page.evaluate("populationViewer.loading")
+    # The first-map action edits the draft only.
+    page.locator("#use-map").click()
+    assert page.evaluate(snapshot)==retained
+    assert page.evaluate("JSON.stringify(populationViewer.draftBounds)===JSON.stringify((()=>{const b=populationViewer.maps[0].getBounds();return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]})())")
+    # A genuine local fixture server exercises rejected HTTP bodies and identity.
+    fixture_server=ThreadingHTTPServer(("127.0.0.1",0),Handler)
+    threading.Thread(target=fixture_server.serve_forever,daemon=True).start()
+    fixture_base=f"http://127.0.0.1:{fixture_server.server_port}"+PREFIX+"__range__/"
+    try:
+        # Forward the test HTTPS endpoint to genuine exact-range server responses.
+        # No test bypass is present in the application's HTTPS policy.
+        remote="https://range-fixture.example.test/count.tif"
+        ranges=[]
+        def fulfill_range(route):
+            header=route.request.headers.get("range")
+            response=page.request.get(fixture_base+"normal.tif",headers={"Range":header})
+            ranges.append(header)
+            route.fulfill(status=response.status,headers=response.headers,body=response.body())
+        page.route(remote,fulfill_range)
+        nyc=[-74.05,40.68,-73.90,40.83]
+        for key,value in zip(('west','south','east','north'),nyc):
+            page.locator('#'+key).fill('');page.locator('#'+key).press_sequentially(str(value))
+            assert float(page.locator('#'+key).input_value())==value
+        assert page.evaluate('populationViewer.draftBounds')==nyc
+        assert page.locator("#compare").is_disabled() and "outside" in page.locator("#load-plan").inner_text()
+        page.locator("#raster-source").select_option("remote")
+        page.locator("#raster-use-area").click()
+        assert [float(page.locator('#'+key).input_value()) for key in ('rw','rs','re','rn')]==nyc
+        page.locator("#raster-url").fill(remote)
+        metadata=json.loads(page.locator("#raster-metadata").input_value())
+        metadata.update(id="remote-synthetic-nyc",title="Explicit synthetic HTTPS transport fixture",synthetic=True,source_asset=remote)
+        page.locator("#raster-metadata").fill(json.dumps(metadata));page.locator("#raster-declaration").check()
+        page.locator("#raster-plan").click();page.locator("#raster-submit").wait_for(state="visible")
+        page.wait_for_function("!document.getElementById('raster-submit').disabled")
+        assert page.evaluate(snapshot)==retained
+        assert "Headers only" in page.locator("#raster-status").inner_text()
+        fixture=tiff(west=-74.1,north=40.9,dx=.15,dy=.15)
+        entries=tiff_entries(fixture)
+        pixel_start=struct.unpack_from('<I',fixture,entries[273]+8)[0]
+        pixel_end=pixel_start+struct.unpack_from('<I',fixture,entries[279]+8)[0]
+        assert ranges
+        assert all((lambda a,b:b<pixel_start or a>=pixel_end)(*map(int,re.fullmatch(r'bytes=(\d+)-(\d+)',header).groups())) for header in ranges),ranges
+        page.locator("#raster-submit").click()
+        page.wait_for_function("populationViewer.layers.length===5")
+        assert page.evaluate("populationViewer.bounds")==nyc
+        imported=page.evaluate("populationViewer.layers.at(-1)")
+        assert imported["grid"]["values"]==[0,None,10,20]
+        assert imported["metadata"]["acquisition"]["actual_bytes"]>0
+        assert "validation" not in imported["metadata"] and "processing_receipt" not in imported["metadata"]
+        assert imported["metadata"]["file_declarations"]["url"]==remote
+        assert any(int(re.fullmatch(r'bytes=(\d+)-(\d+)',header)[1])==pixel_start for header in ranges)
+        assert 'LOCAL FILE' not in page.locator('#results').inner_text()
+        assert 'verified HTTP 206 ranges' in page.locator('#results').inner_text()
+        assert 'LOCAL FILE' not in download_text(page,'#svg')
+        page.unroute(remote)
+        # Worker failures use real HTTP206 error fixtures, with the same UI retained.
+        committed=page.evaluate(snapshot)
+        for mode in ('ignored','malformed','truncated','changed','no-cors','unexposed','no-identity'):
+            bad_remote=f"https://range-fixture.example.test/{mode}.tif"
+            def fulfill_bad(route,mode=mode):
+                try:
+                    response=page.request.get(fixture_base+mode+'.tif',headers={"Range":route.request.headers['range']})
+                    route.fulfill(status=response.status,headers=response.headers,body=response.body())
+                except Exception:
+                    route.abort()
+            page.route(bad_remote,fulfill_bad)
+            page.locator('#raster-url').fill(bad_remote)
+            metadata['id']=mode;page.locator('#raster-metadata').fill(json.dumps(metadata))
+            page.locator('#raster-plan').click()
+            page.wait_for_function("document.getElementById('raster-status').textContent==='Import rejected.'")
+            assert page.evaluate(snapshot)==committed
+            page.unroute(bad_remote)
+    finally:
+        fixture_server.shutdown()
+    print("BBox planning, reduced acquisition, exact-box cache, staged failure/cancel/stale, map bounds and HTTPS import: PASS",flush=True)
+
+
+def check_first_imports_and_deadlines(page,base):
+    for scenario in ('failure','cancel'):
+        held=[]
+        page.route('**/data/real/worldpop-2025.tif',lambda route:route.abort() if scenario=='failure' else held.append(route))
+        page.goto(base+'viewer/index.html')
+        page.wait_for_function('!!window.populationViewer')
+        if scenario=='cancel':
+            page.locator('#load-cancel').click()
+            for route in held:
+                try:route.abort()
+                except Exception:pass
+        page.wait_for_function('!populationViewer.loading')
+        page.unroute('**/data/real/worldpop-2025.tif')
+        assert page.evaluate('populationViewer.layers.length')==0 and page.evaluate('populationViewer.bounds') is None
+        if scenario=='failure':
+            document=json.loads((ROOT/'data/import-example.geojson').read_text(encoding='utf-8'))
+            document['metadata']['id']='worldpop-2025'
+            page.locator('#import').set_input_files({'name':'reserved.geojson','mimeType':'application/json','buffer':json.dumps(document).encode()})
+            page.wait_for_function("document.getElementById('error').textContent.includes('reserved')")
+            assert page.evaluate('populationViewer.layers.length')==0
+            document['metadata']['id']='first-vector'
+            page.locator('#import').set_input_files({'name':'first.geojson','mimeType':'application/json','buffer':json.dumps(document).encode()})
+            page.wait_for_function('populationViewer.layers.length===1')
+            assert len(page.evaluate('populationViewer.bounds'))==4 and len(page.evaluate('populationViewer.results'))==1
+            retained=page.evaluate('populationViewer.bounds')
+            document['metadata']['id']='second-vector'
+            for feature in document['features']:
+                for coordinate in feature['geometry']['coordinates'][0]:coordinate[1]+=1
+            page.locator('#import').set_input_files({'name':'second.geojson','mimeType':'application/json','buffer':json.dumps(document).encode()})
+            page.wait_for_function('populationViewer.layers.length===2')
+            assert page.evaluate('populationViewer.bounds')==retained
+        else:
+            # An inactive malformed URL must never participate in local form validity.
+            page.locator('#raster-source').select_option('remote');page.locator('#raster-url').fill('invalid url')
+            page.locator('#raster-source').select_option('local')
+            assert page.locator('#raster-url').is_disabled()
+            assert page.locator('#raster-file').get_attribute('required') is not None
+            page.locator('#raster-file').set_input_files({'name':'initial.tif','mimeType':'image/tiff','buffer':tiff()})
+            for key,value in zip(('rw','rs','re','rn'),(10,19.8,10.2,20)):page.locator('#'+key).fill(str(value))
+            metadata=json.loads(page.locator('#raster-metadata').input_value());metadata['id']='worldpop-2025'
+            page.locator('#raster-metadata').fill(json.dumps(metadata));page.locator('#raster-declaration').check();page.locator('#raster-plan').click()
+            assert 'reserved' in page.locator('#error').inner_text() and page.evaluate('populationViewer.layers.length')==0
+            metadata['id']='initial-tiff';page.locator('#raster-metadata').fill(json.dumps(metadata));page.locator('#rw').fill('');page.locator('#raster-plan').click()
+            assert 'four finite coordinates' in page.locator('#error').inner_text() and page.evaluate('populationViewer.layers.length')==0
+            page.locator('#rw').press_sequentially('10')
+            # Control only main-thread phase timers, leaving worker transport intact.
+            page.evaluate("""()=>{window.phaseTimers=new Map();window.timerSerial=1000000000;window.realSetTimeout=setTimeout;window.realClearTimeout=clearTimeout;window.realImportWorker=Worker;
+              window.setTimeout=(callback,delay,...args)=>{if(delay!==120000)return realSetTimeout(callback,delay,...args);const id=++timerSerial;phaseTimers.set(id,callback);return id;};
+              window.clearTimeout=id=>{if(!phaseTimers.delete(id))realClearTimeout(id);};
+              window.Worker=class extends realImportWorker{postMessage(data,...args){if(data.action==='read'){window.releasePlannedRead=()=>super.postMessage(data,...args);return;}return super.postMessage(data,...args);}};}""")
+            page.locator('#raster-plan').click();page.wait_for_function("!document.getElementById('raster-submit').disabled")
+            assert page.evaluate('phaseTimers.size')==0
+            page.evaluate('[...phaseTimers.values()].forEach(callback=>callback())') # Simulated idle review elapsed.
+            assert page.locator('#raster-submit').is_enabled()
+            page.locator('#raster-submit').click()
+            assert page.evaluate('phaseTimers.size')==1 and page.evaluate('populationViewer.layers.length')==0
+            page.evaluate('releasePlannedRead()');page.wait_for_function('populationViewer.layers.length===1')
+            assert page.evaluate('phaseTimers.size')==0 and page.evaluate('populationViewer.bounds')==[10,19.8,10.2,20]
+            assert '2 x 2' in page.locator('#raster-status').inner_text()
+            page.evaluate('()=>{window.setTimeout=realSetTimeout;window.clearTimeout=realClearTimeout;window.Worker=realImportWorker;}')
+        imported_count=page.evaluate('populationViewer.layers.length')
+        page.locator('#example').click();page.locator('#compare').click();page.wait_for_function('!populationViewer.loading')
+        assert page.evaluate('populationViewer.layers.length')==4+imported_count
+        ids=page.evaluate('populationViewer.layers.map(l=>l.metadata.id)')
+        assert len(ids)==len(set(ids)) and len(page.evaluate('populationViewer.results'))==4
+    print('First imports after startup failure/cancel, reserved IDs, raw coordinates, source validity and independent phase deadlines: PASS',flush=True)
+
+
 def check_viewer(page, base):
     errors = []
+    requests = []
     page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("request", lambda request: requests.append(request.url))
     page.goto(base+"viewer/index.html")
     page.wait_for_function("window.populationViewer?.results.length===4")
     oracle = json.loads((ROOT / "data/real/independent_oracle.json").read_text(encoding="utf-8"))
     original = page.evaluate("populationViewer.results")
+    assert not any(urlsplit(url).path.endswith("/data/population.json") for url in requests)
+    assert all(result["grid"]["width"] < 200 for result in original)
+    assert all(result["metadata"]["acquisition"]["transport"] == "verified HTTP 206 ranges" for result in original)
+    assert all(result["metadata"]["acquisition"]["full_file_sha256_verified"] is False for result in original)
+    for result in original:
+        receipt=result["metadata"]["acquisition"]
+        assert receipt["requested_bounds"]==[3.3,6.45,3.45,6.6]
+        assert receipt["source_url"].endswith('/data/real/'+result["metadata"]["id"]+'.tif')
+        assert receipt["completed_at"]>=receipt["started_at"]
+        assert len(receipt["native_extent"])==4 and receipt["source_grid"]["width"]>result["grid"]["width"]
     for result in original:
         expected = oracle["sources"][result["metadata"]["id"]]
         assert result["metadata"]["synthetic"] is False
@@ -134,13 +411,14 @@ def check_viewer(page, base):
     page.locator("#reset").click()
     before = page.evaluate("populationViewer.bounds")
     page.locator("#west").fill("10")
-    page.locator("#compare").click()
+    assert page.locator("#compare").is_disabled()
     assert page.locator("#error").is_visible() and page.evaluate("populationViewer.bounds")==before
     page.locator("#example").click()
     page.locator("#draw").click()
     page.locator("#map-0").click(position={"x":160,"y":100})
     page.locator("#map-0").click(position={"x":300,"y":180})
-    assert page.evaluate("populationViewer.bounds")!=before
+    assert page.evaluate("populationViewer.draftBounds")!=before
+    assert page.evaluate("populationViewer.bounds")==before
     page.locator("#example").click()
     exported = json.loads(download_text(page,"#json"))
     rows = list(csv.DictReader(io.StringIO(download_text(page,"#csv"))))
@@ -163,6 +441,7 @@ def check_viewer(page, base):
         page.locator("#raster-preset").select_option(str(index))
         page.locator("#raster-file").set_input_files(str(ROOT/"data/real"/(id_+".tif")))
         page.locator("#raster-declaration").check()
+        page.locator("#raster-plan").click()
         page.locator("#raster-submit").click()
         page.wait_for_function("n=>populationViewer.layers.length===n",arg=5+index)
         result=page.evaluate("populationViewer.results[0]")
@@ -178,12 +457,20 @@ def check_viewer(page, base):
     page.locator("#raster-preset").select_option("0")
     metadata=json.loads(page.locator("#raster-metadata").input_value());metadata["id"]="cancelled"
     page.locator("#raster-metadata").fill(json.dumps(metadata))
-    page.evaluate("document.getElementById('raster-submit').click();document.getElementById('raster-cancel').click()")
+    page.evaluate("document.getElementById('raster-plan').click();document.getElementById('raster-cancel').click()")
     assert "cancelled" in page.locator("#raster-status").inner_text()
     assert page.evaluate("populationViewer.layers.length")==8
     # Literal TIFF masks/NoData, validation, metadata and decompression limits.
     supported=worker(page,tiff())
     assert supported.get("grid",{}).get("values")==[0,None,10,20],supported
+    # One supported native strip exceeds a transport request but fits block budgets.
+    large=bytearray(tiff(width=1500,height=3000,dx=.001,dy=.001,values=(0,0,0,0)))
+    entries=tiff_entries(large);pixel_start=struct.unpack_from('<I',large,entries[273]+8)[0]
+    struct.pack_into('<I',large,entries[279]+8,18000000)
+    large=large[:pixel_start]+bytearray(18000000)
+    large_result=worker(page,large,(10,19.998,10.002,20))
+    assert large_result.get('grid',{}).get('values') and all(value==0 for value in large_result['grid']['values']),large_result.get('error')
+    assert large_result['plan']['compressed_bytes']==18000000
     sparse=worker(page,tiff(sparse=True))
     assert sparse.get("grid",{}).get("values")==[None,None,10,20],sparse
     deflated=worker(page,tiff(compression=8))
@@ -197,10 +484,13 @@ def check_viewer(page, base):
         assert result.get("error") and "timeout" not in result["error"].lower(),(name,result)
     oversized=worker(page,tiff(width=600,height=600),(10,-40,70,20))
     assert "262144" in oversized.get("error",""),oversized
+    for touch in ((10.2,19.8,10.3,20),(10,19.7,10.2,19.8),(9.9,19.8,10,20),(10,20,10.2,20.1)):
+        assert "outside" in worker(page,tiff(),touch).get("error","")
     state=page.evaluate("({layers:populationViewer.layers.length,bounds:populationViewer.bounds,results:populationViewer.results})")
     page.locator("#raster-file").set_input_files({"name":"negative.tif","mimeType":"image/tiff","buffer":cases["negative"]})
     for key,value in zip(("rw","rs","re","rn"),(10,19.8,10.2,20)):
         page.locator("#"+key).fill(str(value))
+    page.locator("#raster-plan").click()
     page.locator("#raster-submit").click()
     page.locator("#error").wait_for(state="visible")
     assert "TIFF import rejected" in page.locator("#error").inner_text()
@@ -231,6 +521,7 @@ def check_viewer(page, base):
     for key,value in zip(("rw","rs","re","rn"),(10,19.8,10.3,20)):
         page.locator("#"+key).fill(str(value))
     page.locator("#raster-file").set_input_files({"name":"asymmetric.tif","mimeType":"image/tiff","buffer":tiff(values=(0,1000,float('nan'),100000,10000000,10000),width=3,compression=5)})
+    page.locator("#raster-plan").click()
     page.locator("#raster-submit").click()
     page.wait_for_function("populationViewer.layers.length===10")
     pixels=page.evaluate("""async()=>{const img=document.querySelector('#map-0 .native-grid');await img.decode();const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const x=c.getContext('2d');x.drawImage(img,0,0);return {width:c.width,height:c.height,rgba:Array.from(x.getImageData(0,0,c.width,c.height).data)};}""")
@@ -255,7 +546,7 @@ def check_viewer(page, base):
     for key,value in zip(("rw","rs","re","rn"),(10,19.8,23.1072,20)):
         page.locator("#"+key).fill(str(value))
     page.locator("#raster-file").set_input_files({"name":"wide.tif","mimeType":"image/tiff","buffer":tiff(values=(0,)*262144,width=131072,height=2,dx=.0001)})
-    page.locator("#raster-submit").click()
+    page.locator("#raster-plan").click()
     page.wait_for_function("document.getElementById('raster-status').textContent==='Import rejected.'")
     assert "32767" in page.locator("#error").inner_text()
     assert page.evaluate("({layers:populationViewer.layers.length,bounds:populationViewer.bounds,results:populationViewer.results,src:document.querySelector('#map-0 .native-grid').src})")==state
@@ -266,12 +557,12 @@ def check_viewer(page, base):
     assert page.evaluate("document.documentElement.scrollWidth<=innerWidth")
     page.screenshot(path=str(ROOT/"test-results/viewer-mobile.png"),full_page=True)
     page.set_viewport_size({"width":1440,"height":1000})
-    page.route("**/data/population.json",lambda route:route.abort())
+    page.route("**/data/population-catalog.json",lambda route:route.abort())
     page.reload()
     page.locator("#error").wait_for(state="visible")
     assert "Unable to start" in page.locator("#error").inner_text()
     assert page.evaluate("!window.populationViewer")
-    page.unroute("**/data/population.json")
+    page.unroute("**/data/population-catalog.json")
     page.route("**/viewer/app.js",lambda route:route.abort())
     page.reload()
     page.locator("#error").wait_for(state="visible")
@@ -335,6 +626,8 @@ def main():
             if args.source_viewer_only:
                 try:
                     check_viewer(page,base)
+                    check_bbox_workflow(page,base)
+                    check_first_imports_and_deadlines(page,base)
                 finally:
                     browser.close()
                 return
@@ -348,6 +641,8 @@ def main():
             assert page.get_by_role("heading",name="Population grids in the browser",exact=True).is_visible()
             try:
                 check_viewer(page,base)
+                check_bbox_workflow(page,base)
+                check_first_imports_and_deadlines(page,base)
                 check_lab(page,base)
             except Exception:
                 page.screenshot(path=str(ROOT/"test-results/browser-failure.png"),full_page=True)

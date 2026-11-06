@@ -1,12 +1,15 @@
-/* Local files only. GeoTIFF.js 3.0.5, MIT; see vendor/geotiff notices. */
-importScripts('vendor/geotiff/geotiff-3.0.5.js');
+/* Native local/strict-206 windows. GeoTIFF.js 3.0.5, MIT; see vendor notices. */
+importScripts('vendor/geotiff/geotiff-3.0.5.js','range-source.js');
 const LIMIT=262144, MAX_BLOCK_PIXELS=16777216;
 const finite=Number.isFinite;
 // Bound metadata work before GeoTIFF.js walks any image directories.
-async function preflight(file){
+async function preflight(source){
   let bytes=0;
-  async function read(offset,size){if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(size)||offset<0||size<0||offset+size>file.size||(bytes+=size)>8*1024*1024)throw Error('TIFF metadata exceeds bounds or the 8 MiB budget.');return new DataView(await file.slice(offset,offset+size).arrayBuffer());}
-  const head=await read(0,Math.min(16,file.size)),order=head.getUint16(0),little=order===0x4949;
+  // GeoTIFF's default header/IFD lookahead must not acquire adjacent pixels
+  // during planning. Exact directory lengths are already known here.
+  source.metadataSpans=new Map([[0,16]]);
+  async function read(offset,size){if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(size)||offset<0||size<0||(source.size!==null&&offset+size>source.size)||(bytes+=size)>8*1024*1024)throw Error('TIFF metadata exceeds bounds or the 8 MiB budget.');return new DataView(await source.read(offset,size));}
+  const head=await read(0,16),order=head.getUint16(0),little=order===0x4949;
   if(!little&&order!==0x4d4d)throw Error('Invalid TIFF byte order.');
   if(!little)throw Error('Big-endian TIFF is unsupported by this pinned reader; prepare a little-endian excerpt.');
   const version=head.getUint16(2,little),big=version===43;
@@ -21,11 +24,12 @@ async function preflight(file){
     const first=await read(offset,countSize),count=big?number(first,0,8):first.getUint16(0,little);
     if(count>1024)throw Error('TIFF directory exceeds 1024 metadata entries.');
     const entries=await read(offset+countSize,count*entrySize+pointerSize);
+    source.metadataSpans.set(offset,countSize+count*entrySize+pointerSize);
     for(let i=0;i<count;i++){
       const at=i*entrySize,tag=entries.getUint16(at,little),type=entries.getUint16(at+2,little),length=number(entries,at+4,big?8:4)*sizes[type];
       if(tag===330)throw Error('SubIFD rasters/masks are unsupported.');
       if(!Number.isSafeInteger(length)||length>4*1024*1024)throw Error('Unsupported TIFF metadata type/size.');
-      if(length>pointerSize){const dataOffset=number(entries,at+(big?12:8),pointerSize);if(dataOffset+length>file.size)throw Error('TIFF metadata points outside the file.');bytes+=length;if(bytes>8*1024*1024)throw Error('TIFF metadata exceeds the 8 MiB budget.');}
+      if(length>pointerSize){const dataOffset=number(entries,at+(big?12:8),pointerSize);if(dataOffset+length>source.size)throw Error('TIFF metadata points outside the file.');bytes+=length;if(bytes>8*1024*1024)throw Error('TIFF metadata exceeds the 8 MiB budget.');}
     }
     offset=number(entries,count*entrySize,pointerSize);
   }
@@ -49,12 +53,15 @@ function boundedLZW(buffer,size){
   }
   throw Error('Incomplete LZW block.');
 }
-self.onmessage=async ({data:{file,bounds}})=>{
+let pending=null;
+self.onmessage=async ({data:{file,url,bounds,mode,action,expected,limits}})=>{
   try {
-    if(!(file instanceof Blob)||file.size>2**31)throw Error('Choose a TIFF file of at most 2 GiB.');
+    if(action==='read'){if(!pending)throw Error('Plan a native window first.');await pending();pending=null;return;}
+    const source=file?new PopulationSources.BlobSource(file,stats=>self.postMessage({progress:stats}),limits):new PopulationSources.RangeSource(url,{allowSameOrigin:!!expected,limits,onProgress:stats=>self.postMessage({progress:stats})});
+    const startedAt=new Date().toISOString();
     if(!Array.isArray(bounds)||bounds.length!==4||!bounds.every(finite)||!(bounds[0]<bounds[2]&&bounds[1]<bounds[3]&&bounds[0]>=-180&&bounds[2]<=180&&bounds[1]>=-90&&bounds[3]<=90))throw Error('Select valid WGS84 import bounds.');
-    await preflight(file);
-    const tiff=await GeoTIFF.fromBlob(file), count=await tiff.getImageCount();
+    await preflight(source);
+    const tiff=await GeoTIFF.GeoTIFF.fromSource(source,{cache:false}), count=await tiff.getImageCount();
     if(count>32)throw Error('TIFF has too many image directories.');
     for(let i=0;i<count;i++){
       const candidate=await tiff.getImage(i), d=candidate.getFileDirectory(),kind=d.getValue('NewSubfileType')||0;
@@ -72,6 +79,7 @@ self.onmessage=async ({data:{file,bounds}})=>{
     if(![dx,dy,i,j,x,y].every(finite)||dx<=0||dy<=0||dx>5||dy>5||k!==0||z!==0)throw Error('Unsupported TIFF transform.');
     const west=x-i*dx,north=y+j*dy,width=image.getWidth(),height=image.getHeight();
     if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||west< -180||west+width*dx>180.00000001||north>90||north-height*dy< -90.00000001)throw Error('TIFF dimensions or geographic extent are invalid.');
+    if(bounds[0]>=west+width*dx||bounds[2]<=west||bounds[1]>=north||bounds[3]<=north-height*dy)throw Error('Selected area lies outside this TIFF.');
     const raw=String(await d.loadValue('GDAL_METADATA')||'');
     const metadata=await image.getGDALMetadata(0)||{}, allMetadata=await image.getGDALMetadata()||{};
     if(Object.keys({...allMetadata,...metadata}).some(key=>/scale|offset/i.test(key))||/(?:name|role)\s*=\s*["'][^"']*(?:scale|offset)[^"']*["']/i.test(raw))throw Error('TIFF scale/offset metadata is unsupported; counts must be stored directly.');
@@ -86,20 +94,27 @@ self.onmessage=async ({data:{file,bounds}})=>{
     const y0=Math.max(0,Math.min(height,Math.floor((north-bounds[3])/dy))),y1=Math.max(0,Math.min(height,Math.ceil((north-bounds[1])/dy)));
     if(x1<=x0||y1<=y0)throw Error('Selected area lies outside this TIFF.');
     if((x1-x0)*(y1-y0)>LIMIT)throw Error(`Selected native window exceeds ${LIMIT} cells. Choose smaller import bounds; no resampling is performed.`);
-    const bits=image.getBitsPerSample(),format=image.getSampleFormat(),compression=d.getValue('Compression')||1,predictor=d.getValue('Predictor')||1;
-    if(!([1,2].includes(format)?[8,16,32]:format===3?[32,64]:[]).includes(bits)||![1,5,8,32946].includes(compression)||(d.getValue('Orientation')||1)!==1||![0,1].includes(d.getValue('PhotometricInterpretation')??1)||![1,2,3].includes(predictor)||(predictor===2&&bits===64)||(predictor===3&&format!==3))throw Error('Unsupported sample encoding, compression, predictor, color or orientation. Use integer/float counts with uncompressed, LZW or Deflate encoding.');
+    const bits=image.getBitsPerSample(),format=image.getSampleFormat(),compression=d.getValue('Compression')??1,predictor=d.getValue('Predictor')??1;
+    if(!([1,2].includes(format)?[8,16,32]:format===3?[32,64]:[]).includes(bits)||![1,5,8,32946].includes(compression)||(d.getValue('Orientation')??1)!==1||![0,1].includes(d.getValue('PhotometricInterpretation')??1)||![1,2,3].includes(predictor)||(predictor===2&&bits===64)||(predictor===3&&format!==3))throw Error('Unsupported sample encoding, compression, predictor, color or orientation. Use integer/float counts with uncompressed, LZW or Deflate encoding.');
     const blockWidth=image.getTileWidth(),blockHeight=image.getTileHeight();
     const declaredDimensions=image.isTiled?[d.getValue('TileWidth'),d.getValue('TileLength')]:[d.getValue('RowsPerStrip')??height];
     if([...declaredDimensions,blockWidth,blockHeight].some(value=>!Number.isSafeInteger(value)||value<=0))throw Error('TIFF tile/strip dimensions must be positive integers.');
     if(blockWidth*blockHeight>MAX_BLOCK_PIXELS)throw Error('TIFF decode blocks exceed the 16 million-pixel memory limit; prepare a tiled excerpt first.');
     const blocks=(Math.ceil(x1/blockWidth)-Math.floor(x0/blockWidth))*(Math.ceil(y1/blockHeight)-Math.floor(y0/blockHeight));
-    if(blocks*blockWidth*blockHeight*bits/8>128*1024*1024)throw Error('Selected window requires more than 128 MiB of decoded source blocks; prepare a tiled excerpt first.');
     const byteCounts=await d.loadValue(image.isTiled?'TileByteCounts':'StripByteCounts'),offsets=await d.loadValue(image.isTiled?'TileOffsets':'StripOffsets'),across=Math.ceil(width/blockWidth);
-    let compressed=0;
+    let compressed=0,decoded=0;
     for(let by=Math.floor(y0/blockHeight);by<Math.ceil(y1/blockHeight);by++)for(let bx=Math.floor(x0/blockWidth);bx<Math.ceil(x1/blockWidth);bx++){
       const index=by*across+bx,size=Number(byteCounts?.[index]),offset=Number(offsets?.[index]);
-      if(!Number.isSafeInteger(size)||!Number.isSafeInteger(offset)||size<0||offset<0||offset+size>file.size||(size===0)!==(offset===0)||(compressed+=size)>64*1024*1024)throw Error('Selected TIFF blocks exceed file bounds or the 64 MiB compressed budget.');
+      if(!Number.isSafeInteger(size)||!Number.isSafeInteger(offset)||size<0||offset<0||offset+size>source.size||(size===0)!==(offset===0)||(compressed+=size)>64*1024*1024)throw Error('Selected TIFF blocks exceed file bounds or the 64 MiB compressed budget.');
+      decoded+=blockWidth*image.getBlockHeight(by)*bits/8;
     }
+    if(decoded>128*1024*1024)throw Error('Selected window requires more than 128 MiB of decoded source blocks; prepare a tiled excerpt first.');
+    const grid={width,height,west,north,dx,dy};
+    if(x1-x0>32767||y1-y0>32767)throw Error('Native display axes are limited to 32767 pixels. Choose smaller bounds.');
+    const layout={width,height,block_width:blockWidth,block_height:blockHeight,bits_per_sample:bits,sample_format:format,compression,predictor,tiled:image.isTiled,block_offsets:Array.from(offsets,Number),block_byte_counts:Array.from(byteCounts,Number)};
+    const plan={native_window:[x0,y0,x1,y1],width:x1-x0,height:y1-y0,cells:(x1-x0)*(y1-y0),output_bytes:(x1-x0)*(y1-y0)*8,blocks,compressed_bytes:compressed,decoded_bytes:decoded,layout:image.isTiled?'tiles':'full-width strips'};
+    if(expected&&(source.size!==expected.asset_size||Object.entries(expected.grid).some(([key,value])=>grid[key]!==value)||Object.keys(expected.layout).some(key=>JSON.stringify(layout[key])!==JSON.stringify(expected.layout[key]))))throw Error('Prepared TIFF metadata differs from the pinned catalog.');
+    const readWindow=async()=>{
     const output=Array((x1-x0)*(y1-y0)).fill(null);
     for(let by=Math.floor(y0/blockHeight);by<Math.ceil(y1/blockHeight);by++)for(let bx=Math.floor(x0/blockWidth);bx<Math.ceil(x1/blockWidth);bx++){
       const part=[Math.max(x0,bx*blockWidth),Math.max(y0,by*blockHeight),Math.min(x1,(bx+1)*blockWidth),Math.min(y1,(by+1)*blockHeight)],sparse=Number(byteCounts[by*across+bx])===0,blockBytes=blockWidth*image.getBlockHeight(by)*bits/8;
@@ -120,6 +135,8 @@ self.onmessage=async ({data:{file,bounds}})=>{
         output[(row-y0)*(x1-x0)+column-x0]=value;
       }
     }
-    self.postMessage({grid:{width:x1-x0,height:y1-y0,west:west+x0*dx,north:north-y0*dy,dx,dy,values:output},file_declarations:{name:file.name,size:file.size,last_modified:file.lastModified,source_dimensions:[width,height],source_grid:{west,north,dx,dy},native_window:[x0,y0,x1,y1],nodata:Number.isNaN(nodata)?'NaN':nodata,geo_keys:keys,gdal_metadata:allMetadata,band_metadata:metadata,mask_policy:'No internal mask/alpha accepted. External .msk sidecars are not read; user must declare none.',reader:'GeoTIFF.js 3.0.5',processing:'Local-file native window; no resampling, scale, reprojection or server computation'}});
+    self.postMessage({plan,acquisition:{...source.stats,started_at:startedAt,completed_at:new Date().toISOString(),requested_bounds:bounds.slice(),source_url:file?null:source.url,local_file:file?{name:file.name,size:file.size,last_modified:file.lastModified}:null,asset_size:source.size,expected_asset_sha256:expected?.asset_sha256||null,full_file_sha256_verified:false,source_grid:grid,native_window:[x0,y0,x1,y1],native_extent:[west+x0*dx,north-y1*dy,west+x1*dx,north-y0*dy],processing:'Native window; no resampling, scale, reprojection or server computation'},grid:{width:x1-x0,height:y1-y0,west:west+x0*dx,north:north-y0*dy,dx,dy,values:output},file_declarations:{name:file?.name||null,url:file?null:source.url,size:source.size,last_modified:file?.lastModified||null,source_dimensions:[width,height],source_grid:{west,north,dx,dy},native_window:[x0,y0,x1,y1],nodata:Number.isNaN(nodata)?'NaN':nodata,geo_keys:keys,gdal_metadata:allMetadata,band_metadata:metadata,mask_policy:'No internal mask/alpha accepted. External .msk sidecars are not read; user must declare none.',reader:'GeoTIFF.js 3.0.5',processing:'Native window; no resampling, scale, reprojection or server computation'}});
+    };
+    if(mode==='plan'){pending=readWindow;self.postMessage({plan,source_grid:grid,acquisition:{...source.stats,asset_size:source.size}});}else await readWindow();
   } catch(error){self.postMessage({error:error.message});}
 };

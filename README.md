@@ -8,7 +8,7 @@
 
 Compare real population products in four linked maps, inspect native pixels, and reproduce area totals in browser Python. Inspired by the POPGRID Viewer workflow and the research and stewardship of NASA, SEDAC/CIESIN and the POPGRID Data Collaborative. This is an independent project. [Leyk et al. (2019)](https://doi.org/10.5194/essd-11-1385-2019) explain why fitness for use matters more than nominal cell size.
 
-The default viewer uses genuine **native-pixel Greater Lagos excerpts**, with source values and NoData retained without resampling. Prepared extent: `[3.2, 6.35, 3.6, 6.7]` (W,S,E,N); edge cells follow native grid boundaries. It is a regional prepared bundle, not global raster streaming. Explicit synthetic fixtures remain for tests and small GeoJSON lessons only; failures show errors and never substitute them.
+The default viewer uses genuine **native-pixel Greater Lagos excerpts**, with source values and NoData retained without resampling. Prepared extent: `[3.2, 6.35, 3.6, 6.7]` (W,S,E,N); edge cells follow native grid boundaries. The ready-to-use Lagos comparison loads bounded native windows from a lightweight catalog; viewer startup never downloads the full count JSON. The four prepared products cover this region. Compatible public HTTPS or local count TIFFs can supply other supported areas. Explicit synthetic fixtures remain for tests and small GeoJSON lessons only; failures show errors and never substitute them.
 
 | Bundled product | Release and reference | Concept and important limits |
 | --- | --- | --- |
@@ -28,9 +28,13 @@ Recommended citations for the releases actually used:
 
 The shared analysis rectangle `[3.30, 6.45, 3.45, 6.60]` gives approximately **3,058,259.42; 2,375,656.06; 7,422,967.00; and 5,013,773.99** people, respectively. Numeric-cell coverage differs. These are spherical overlap-weighted estimates, with uniform population assumed inside each cell. Reference dates, concepts and source census vintages differ. WorldPop and GRID3 share producers/inputs; GHS-POP uses GPW inputs. Agreement is not independent validation and disagreement is not accuracy evidence.
 
-The viewer supports synchronized or independent navigation, a shared density display scale (people/km²), click and keyboard coordinate inspection of native counts, drawn/typed rectangles, and CSV/JSON/SVG exports with full provenance, grid identity, bounds, coverage and method. Zero and NoData remain distinct. Areas outside prepared coverage are explicit. Charts and exports preserve source rights and modification notices.
+The viewer supports synchronized or independent navigation, a shared density display scale (people/km²), click and keyboard coordinate inspection of native counts, typed/drawn/use-map study bounds, staged loading with estimates, progress, cancel and a bounded reusable-window cache, and CSV/JSON/SVG exports with full provenance, grid identity, bounds, coverage and method. Zero and NoData remain distinct. Areas outside prepared coverage are explicit. Charts and exports preserve source rights and modification notices.
 
-For other areas, download a source **single-band, little-endian, north-up EPSG:4326 count GeoTIFF** yourself, edit its metadata declaration, and import a selected native window locally. A cancellable worker reads at most **262,144 output cells**, under metadata/block/decompression budgets; it rejects unsupported CRS, masks, scale/offset, geometry and invalid counts. Source declarations are user-supplied, and fresh file/window declarations travel with results. No file is uploaded and no server performs analysis. Small rectangular-cell GeoJSON import remains limited to 2 MB / 2,000 nonoverlapping cells. See [the import contract](book/methods.md).
+Choose study bounds before loading. Orange dashed rectangles are drafts; blue rectangles and exports retain the last successful comparison until all four native windows and display images pass validation. Plans report cells, output count memory, selected compressed blocks and decoded block memory. Full-width TIFF strips can cost the same network bytes after west/east narrowing; actual transfer also includes headers and repeated metadata. Same-asset/hash snapped windows reuse bounded session counts while recalculating exact-box totals. "Compare already loaded windows" explicitly recalculates existing support without fetching more pixels.
+
+For other areas, select a public **HTTPS** or local **single-band, little-endian, north-up EPSG:4326 count GeoTIFF**, review its metadata declaration, and copy the current study bounds. Plan headers first, then read the native window. A successful import commits its chosen comparison bounds with the native image and values. The editable LandScan Global 2020 pinned-mirror template supports remote windows; its lineage is user-declared and copied Lagos verification claims are removed. This does not imply remote access to all four products. No file is uploaded and no server performs analysis. The companion [JupyterLite-STAC-Browser](https://github.com/jltobias/JupyterLite-STAC-Browser) inspired bbox-first acquisition and its MIT bounded Range reader; the pinned code credit is in [the reader notices](viewer/vendor/geotiff/README.md).
+
+Remote origins must return exact HTTP 206 ranges and expose Content-Range plus a strong ETag or Last-Modified through CORS. Last-Modified has weaker, second-level identity precision. HTTP 200 ignored-Range bodies are rejected without consumption; changed, malformed or truncated ranges fail. There is no full-file fallback, resampling, proxy or TLS bypass. Acquisition receipts preserve stable source URLs, request/actual byte counts and native windows; partial reads never verify a full-file SHA. Signed query URLs and credentials are rejected. Local files retain the 2 GiB file limit; remote assets may be larger if bounded work fits the limits. See [the import contract](book/methods.md) for metadata, request, memory and timeout limits. Small rectangular-cell GeoJSON remains limited to 2 MB / 2,000 nonoverlapping cells.
 
 WorldPop and GRID3 file downloads currently lack browser CORS and ignore Range requests; their metadata access does not imply numerical browser access. Local files and prepared same-origin excerpts solve this without proxies or TLS bypass. **No GPW pixels are bundled**: present Harvard Dataverse access uses a guestbook, and this project does not collect or submit personal details. GHS-POP is the additional open product. HRSL and Esri WPE remain historical candidates. STAC Index is a discovery directory, not a data producer or proof of numerical access.
 
@@ -40,6 +44,7 @@ Install the pinned standard build dependencies, then verify:
 
 ```powershell
 python -m pip install -r requirements.txt
+python scripts/create_population_catalog.py --check
 python -m unittest discover -s tests -v
 python scripts/build_site.py
 python scripts/check_browser.py
@@ -55,6 +60,8 @@ python scripts/prepare_population.py --download --retrieval-date 2026-11-06
 ```
 
 The date above is the known acquisition date of the preserved original inputs. For other manually supplied inputs, declare their actual retrieval date; existing acquisition receipts take precedence.
+
+Explicit preparation also stages the deterministic, value-free `data/population-catalog.json` from canonical geometry and TIFF sizes/hashes/block tables, using a standard-library generator. Normal builds copy the checked-in catalog without refreshing sources. Canonical notebook arrays and original TIFF bytes/receipts remain unchanged.
 
 The ignored `.cache/population/` preserves acquisition inputs independently of build cleanup. The publication builder uses an explicit allowlist and records hashes in `_site/publication.json`; it never publishes cache, development tools, machine settings or credentials. Independent rasterio/NumPy source expectations are preserved in [the oracle](data/real/independent_oracle.json). Tests cover native source values, masks, boundary fractions, rejected inputs, actual TIFF imports/exports, mobile layout and all three real Pyodide lessons.
 

@@ -32,6 +32,9 @@ def run(arguments, cwd):
 
 
 def main():
+    from create_population_catalog import serialized
+    if (ROOT / "data/population-catalog.json").read_text(encoding="utf-8") != serialized(ROOT / "data"):
+        raise ValueError("Population catalog is stale; regenerate it during explicit preparation.")
     clean(SITE)
     clean(STAGE)
     book = STAGE / "book"
@@ -75,13 +78,13 @@ def main():
         raise RuntimeError("Pinned JupyterLite configuration loader changed; recheck publication cleanup.")
     bootstrap.write_text(bootstrap_text.replace(old, "const LITE_FILES = ['jupyter-lite.json'];"), encoding="utf-8", newline="\n")
     # Explicit project assets only: never publish _bmad, config, tests, credentials, or Git metadata.
-    for name in ("index.html", "app.js", "analysis.js", "style.css", "raster-worker.js"):
+    for name in ("index.html", "app.js", "analysis.js", "style.css", "raster-worker.js", "range-source.js"):
         copy(ROOT / "viewer" / name, SITE / "viewer" / name)
     for name in ("leaflet.js", "leaflet.css", "LICENSE", "images/layers.png", "images/layers-2x.png", "images/marker-icon.png", "images/marker-icon-2x.png", "images/marker-shadow.png"):
         copy(ROOT / "viewer/vendor/leaflet" / name, SITE / "viewer/vendor/leaflet" / name)
     for name in ("geotiff-3.0.5.js", "LICENSE-geotiff", "LICENSE-companion", "RASTER-DEPENDENCIES.json", "RASTER-DEPENDENCY-LICENSES.txt", "README.md"):
         copy(ROOT / "viewer/vendor/geotiff" / name, SITE / "viewer/vendor/geotiff" / name)
-    for name in ("demo.json", "population.json", "import-example.geojson", "README.md"):
+    for name in ("demo.json", "population.json", "population-catalog.json", "import-example.geojson", "README.md"):
         copy(ROOT / "data" / name, SITE / "data" / name)
     for name in REAL_FILES:
         copy(ROOT / "data/real" / name, SITE / "data/real" / name)
@@ -92,9 +95,11 @@ def main():
     (SITE / ".nojekyll").touch()
     manifest = {"fixture_sha256": hashlib.sha256((ROOT / "data/demo.json").read_bytes()).hexdigest(), "notebook_sha256": {name: hashlib.sha256((ROOT / "notebooks" / name).read_bytes()).hexdigest() for name in NOTEBOOKS}, "calculation_sha256": {"lab/files/population_tools.py": hashlib.sha256((ROOT / "notebooks/population_tools.py").read_bytes()).hexdigest(), "viewer/analysis.js": hashlib.sha256((ROOT / "viewer/analysis.js").read_bytes()).hexdigest()}, "destinations": ["book/intro.html", "lab/lab/index.html", "viewer/index.html"]}
     manifest["population_sha256"] = hashlib.sha256((ROOT / "data/population.json").read_bytes()).hexdigest()
+    manifest["population_catalog_sha256"] = hashlib.sha256((ROOT / "data/population-catalog.json").read_bytes()).hexdigest()
     manifest["real_assets_sha256"] = {name: hashlib.sha256((ROOT / "data/real" / name).read_bytes()).hexdigest() for name in REAL_FILES}
     manifest["calculation_sha256"]["lab/files/population_tools_real.py"] = manifest["calculation_sha256"]["lab/files/population_tools.py"]
     manifest["calculation_sha256"]["viewer/raster-worker.js"] = hashlib.sha256((ROOT / "viewer/raster-worker.js").read_bytes()).hexdigest()
+    manifest["calculation_sha256"]["viewer/range-source.js"] = hashlib.sha256((ROOT / "viewer/range-source.js").read_bytes()).hexdigest()
     manifest["raster_reader_sha256"] = hashlib.sha256((ROOT / "viewer/vendor/geotiff/geotiff-3.0.5.js").read_bytes()).hexdigest()
     manifest["launch_notebook"] = NOTEBOOKS[0]
     (SITE / "publication.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

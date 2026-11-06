@@ -216,10 +216,14 @@ def main():
                 expected["aoi_coverage"] = 1
         published_oracle["coverage_roundoff_policy"] = "Clamp tiny coverage excess to one; retain original independent value in aoi_coverage_unclamped."
         write(stage_real / "independent_oracle.json", published_oracle)
-        # Every source, oracle and preserved receipt passed before canonical mutation.
+        # Generate metadata-only catalog in the same staging transaction.
+        from create_population_catalog import serialized
+        (stage / "population-catalog.json").write_text(serialized(stage), encoding="utf-8", newline="\n")
+        # Every source, oracle, catalog and preserved receipt passed before canonical mutation.
         for path in stage_real.iterdir():
             path.replace(OUT / path.name)
         (stage / "population.json").replace(ROOT / "data/population.json")
+        (stage / "population-catalog.json").replace(ROOT / "data/population-catalog.json")
     print("Prepared four native-pixel grids; verified masks and native sums against independent source oracle.")
 
 

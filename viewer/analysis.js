@@ -108,6 +108,33 @@ export function layerBounds(layer){
 export function nativeWindow(g,bounds){
   return [Math.max(0,Math.min(g.width,Math.floor((bounds[0]-g.west)/g.dx))),Math.max(0,Math.min(g.height,Math.floor((g.north-bounds[3])/g.dy))),Math.max(0,Math.min(g.width,Math.ceil((bounds[2]-g.west)/g.dx))),Math.max(0,Math.min(g.height,Math.ceil((g.north-bounds[1])/g.dy)))];
 }
+// Planning uses catalog geometry/block tables, never population values.
+export function planWindow(source,bounds){
+  validateBounds(bounds);
+  if(!intersection(bounds,gridBounds(source.grid)))throw Error('Study bounds lie outside this source.');
+  const g=source.grid,l=source.layout,[x0,y0,x1,y1]=nativeWindow(g,bounds),width=x1-x0,height=y1-y0;
+  if(width<=0||height<=0)throw Error('Study bounds lie outside this source.');
+  const cells=width*height;
+  if(cells>MAX_GRID_CELLS)throw Error(`Selected native window exceeds ${MAX_GRID_CELLS} cells. Choose smaller bounds; no resampling is performed.`);
+  if(width>32767||height>32767)throw Error('Native display axes are limited to 32767 pixels. Choose smaller bounds.');
+  const bw=l.block_width,bh=l.block_height,across=Math.ceil(g.width/bw),indices=[];
+  if(![bw,bh].every(v=>Number.isSafeInteger(v)&&v>0)||bw*bh>16777216)throw Error('Unsupported native TIFF block dimensions.');
+  let compressed=0,decoded=0;
+  for(let by=Math.floor(y0/bh);by<Math.ceil(y1/bh);by++)for(let bx=Math.floor(x0/bw);bx<Math.ceil(x1/bw);bx++){
+    const index=by*across+bx,size=Number(l.block_byte_counts[index]),offset=Number(l.block_offsets[index]);
+    if(!Number.isSafeInteger(size)||!Number.isSafeInteger(offset)||size<0||offset<0||offset+size>source.asset_size||(size===0)!==(offset===0))throw Error('TIFF blocks exceed declared asset bounds.');
+    indices.push(index);compressed+=size;
+    decoded+=bw*(l.tiled?bh:Math.min(bh,g.height-by*bh))*l.bits_per_sample/8;
+  }
+  if(compressed>64*1024*1024||decoded>128*1024*1024)throw Error('Selected blocks exceed 64 MiB compressed / 128 MiB decoded limits. Choose smaller bounds or a tiled excerpt.');
+  return {native_window:[x0,y0,x1,y1],width,height,cells,output_bytes:cells*8,blocks:indices.length,compressed_bytes:compressed,decoded_bytes:decoded,layout:l.tiled?'tiles':'full-width strips',partial_coverage:!bounds.every((v,i)=>i<2?v>=gridBounds(g)[i]:v<=gridBounds(g)[i])};
+}
+
+export class WindowCache {
+  constructor(maxBytes=16*1024*1024,maxEntries=16){this.maxBytes=maxBytes;this.maxEntries=maxEntries;this.entries=new Map();this.bytes=0;}
+  get(key){const entry=this.entries.get(key);if(!entry)return null;this.entries.delete(key);this.entries.set(key,entry);return entry.value;}
+  set(key,value){const size=value.grid.values.length*8;if(this.entries.has(key)){this.bytes-=this.entries.get(key).size;this.entries.delete(key);}if(size>this.maxBytes)return;this.entries.set(key,{value,size});this.bytes+=size;while(this.bytes>this.maxBytes||this.entries.size>this.maxEntries){const first=this.entries.keys().next().value;this.bytes-=this.entries.get(first).size;this.entries.delete(first);}}
+}
 export function* iterateCells(layer,bounds=layerBounds(layer)){
   if(!layer.grid){yield* layer.cells;return;}
   const g=layer.grid,[x0,y0,x1,y1]=nativeWindow(g,bounds);

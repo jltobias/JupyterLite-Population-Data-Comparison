@@ -17,6 +17,14 @@ class RealPopulationTests(unittest.TestCase):
         cls.data = json.loads((ROOT / "data/population.json").read_text(encoding="utf-8"))
         cls.oracle = json.loads((ROOT / "data/real/independent_oracle.json").read_text(encoding="utf-8"))
 
+    def test_value_free_catalog_matches_prepared_bytes(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from create_population_catalog import serialized
+        content=(ROOT / "data/population-catalog.json").read_text(encoding="utf-8")
+        self.assertEqual(content, serialized(ROOT / "data"))
+        self.assertLess(len(content.encode("utf-8")), 100000)
+        self.assertTrue(all("values" not in source["grid"] for source in json.loads(content)["sources"]))
+
     def test_real_source_expectations_and_masks(self):
         results = compare(self.data["layers"], self.data["default_aoi"])
         for layer, result in zip(self.data["layers"], results):
