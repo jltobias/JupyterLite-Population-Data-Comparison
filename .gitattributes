@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.png binary
+# Keep the pinned upstream distribution byte-exact; review its version and license.
+viewer/vendor/leaflet/leaflet.js -text -diff

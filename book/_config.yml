@@ -1,0 +1,19 @@
+title: Population grids in the browser
+author: JupyterLite-Population-Data-Comparison contributors
+copyright: "2026"
+only_build_toc_files: true
+execute:
+  execute_notebooks: force
+  timeout: 120
+  run_in_temp: false
+html:
+  use_repository_button: true
+  use_issues_button: true
+  extra_navbar: 'Synthetic teaching grids · no observed population data'
+repository:
+  url: https://github.com/jltobias/JupyterLite-Population-Data-Comparison
+  branch: main
+sphinx:
+  config:
+    html_show_sourcelink: false
+    suppress_warnings: [myst.header]

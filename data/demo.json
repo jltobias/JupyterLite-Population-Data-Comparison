@@ -1,0 +1,1090 @@
+{
+  "schema_version": "1.0",
+  "description": "SYNTHETIC teaching grids on an invented study rectangle. These are not observed population estimates.",
+  "bounds": [
+    120,
+    14,
+    120.4,
+    14.4
+  ],
+  "default_aoi": [
+    120.1,
+    14.1,
+    120.3,
+    14.3
+  ],
+  "layers": [
+    {
+      "metadata": {
+        "id": "uniform",
+        "title": "Synthetic uniform allocation",
+        "source": "JupyterLite-Population-Data-Comparison project; generated teaching fixture",
+        "citation": "JupyterLite-Population-Data-Comparison contributors (2026). Invented comparison cells, version 1.0. No observed population data.",
+        "license": "CC0-1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "year": 2020,
+        "version": "1.0",
+        "synthetic": true,
+        "units": "people/cell",
+        "crs": "EPSG:4326",
+        "resolution": "0.1 degree rectangular cells (invented)",
+        "population_concept": "Invented residential scenario",
+        "allocation": "Equal allocation within each invented census zone",
+        "census_vintage": "None; no census inputs",
+        "retrieval_date": "Not applicable; generated locally",
+        "publication_date": "2026-11-06",
+        "modifications": "Generated from deterministic arithmetic; no real data inputs",
+        "notice": "SYNTHETIC: not GPW, WorldPop, LandScan, HRSL, GHS-POP or Esri WPE."
+      },
+      "cells": [
+        {
+          "bounds": [
+            120.0,
+            14.0,
+            120.1,
+            14.1
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.1,
+            14.0,
+            120.2,
+            14.1
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.2,
+            14.0,
+            120.3,
+            14.1
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.3,
+            14.0,
+            120.4,
+            14.1
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.0,
+            14.1,
+            120.1,
+            14.2
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.1,
+            14.1,
+            120.2,
+            14.2
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.2,
+            14.1,
+            120.3,
+            14.2
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.3,
+            14.1,
+            120.4,
+            14.2
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.0,
+            14.2,
+            120.1,
+            14.3
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.1,
+            14.2,
+            120.2,
+            14.3
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.2,
+            14.2,
+            120.3,
+            14.3
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.3,
+            14.2,
+            120.4,
+            14.3
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.0,
+            14.3,
+            120.1,
+            14.4
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.1,
+            14.3,
+            120.2,
+            14.4
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.2,
+            14.3,
+            120.3,
+            14.4
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.3,
+            14.3,
+            120.4,
+            14.4
+          ],
+          "population": 100
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "id": "settlement",
+        "title": "Synthetic settlement weighting",
+        "source": "JupyterLite-Population-Data-Comparison project; generated teaching fixture",
+        "citation": "JupyterLite-Population-Data-Comparison contributors (2026). Invented comparison cells, version 1.0. No observed population data.",
+        "license": "CC0-1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "year": 2020,
+        "version": "1.0",
+        "synthetic": true,
+        "units": "people/cell",
+        "crs": "EPSG:4326",
+        "resolution": "0.05 degree rectangular cells (invented)",
+        "population_concept": "Invented residential scenario",
+        "allocation": "Invented settlement weights; conserved overall total",
+        "census_vintage": "None; no census inputs",
+        "retrieval_date": "Not applicable; generated locally",
+        "publication_date": "2026-11-06",
+        "modifications": "Generated from deterministic arithmetic; no real data inputs",
+        "notice": "SYNTHETIC: not GPW, WorldPop, LandScan, HRSL, GHS-POP or Esri WPE."
+      },
+      "cells": [
+        {
+          "bounds": [
+            120.0,
+            14.0,
+            120.05,
+            14.05
+          ],
+          "population": 10
+        },
+        {
+          "bounds": [
+            120.05,
+            14.0,
+            120.1,
+            14.05
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.1,
+            14.0,
+            120.15,
+            14.05
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.15,
+            14.0,
+            120.2,
+            14.05
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.2,
+            14.0,
+            120.25,
+            14.05
+          ],
+          "population": 10
+        },
+        {
+          "bounds": [
+            120.25,
+            14.0,
+            120.3,
+            14.05
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.3,
+            14.0,
+            120.35,
+            14.05
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.35,
+            14.0,
+            120.4,
+            14.05
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.0,
+            14.05,
+            120.05,
+            14.1
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.05,
+            14.05,
+            120.1,
+            14.1
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.1,
+            14.05,
+            120.15,
+            14.1
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.15,
+            14.05,
+            120.2,
+            14.1
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.2,
+            14.05,
+            120.25,
+            14.1
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.25,
+            14.05,
+            120.3,
+            14.1
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.3,
+            14.05,
+            120.35,
+            14.1
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.35,
+            14.05,
+            120.4,
+            14.1
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.0,
+            14.1,
+            120.05,
+            14.15
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.05,
+            14.1,
+            120.1,
+            14.15
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.1,
+            14.1,
+            120.15,
+            14.15
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.15,
+            14.1,
+            120.2,
+            14.15
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.2,
+            14.1,
+            120.25,
+            14.15
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.25,
+            14.1,
+            120.3,
+            14.15
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.3,
+            14.1,
+            120.35,
+            14.15
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.35,
+            14.1,
+            120.4,
+            14.15
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.0,
+            14.15,
+            120.05,
+            14.2
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.05,
+            14.15,
+            120.1,
+            14.2
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.1,
+            14.15,
+            120.15,
+            14.2
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.15,
+            14.15,
+            120.2,
+            14.2
+          ],
+          "population": 40
+        },
+        {
+          "bounds": [
+            120.2,
+            14.15,
+            120.25,
+            14.2
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.25,
+            14.15,
+            120.3,
+            14.2
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.3,
+            14.15,
+            120.35,
+            14.2
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.35,
+            14.15,
+            120.4,
+            14.2
+          ],
+          "population": 40
+        },
+        {
+          "bounds": [
+            120.0,
+            14.2,
+            120.05,
+            14.25
+          ],
+          "population": 10
+        },
+        {
+          "bounds": [
+            120.05,
+            14.2,
+            120.1,
+            14.25
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.1,
+            14.2,
+            120.15,
+            14.25
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.15,
+            14.2,
+            120.2,
+            14.25
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.2,
+            14.2,
+            120.25,
+            14.25
+          ],
+          "population": 10
+        },
+        {
+          "bounds": [
+            120.25,
+            14.2,
+            120.3,
+            14.25
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.3,
+            14.2,
+            120.35,
+            14.25
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.35,
+            14.2,
+            120.4,
+            14.25
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.0,
+            14.25,
+            120.05,
+            14.3
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.05,
+            14.25,
+            120.1,
+            14.3
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.1,
+            14.25,
+            120.15,
+            14.3
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.15,
+            14.25,
+            120.2,
+            14.3
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.2,
+            14.25,
+            120.25,
+            14.3
+          ],
+          "population": 15
+        },
+        {
+          "bounds": [
+            120.25,
+            14.25,
+            120.3,
+            14.3
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.3,
+            14.25,
+            120.35,
+            14.3
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.35,
+            14.25,
+            120.4,
+            14.3
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.0,
+            14.3,
+            120.05,
+            14.35
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.05,
+            14.3,
+            120.1,
+            14.35
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.1,
+            14.3,
+            120.15,
+            14.35
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.15,
+            14.3,
+            120.2,
+            14.35
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.2,
+            14.3,
+            120.25,
+            14.35
+          ],
+          "population": 20
+        },
+        {
+          "bounds": [
+            120.25,
+            14.3,
+            120.3,
+            14.35
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.3,
+            14.3,
+            120.35,
+            14.35
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.35,
+            14.3,
+            120.4,
+            14.35
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.0,
+            14.35,
+            120.05,
+            14.4
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.05,
+            14.35,
+            120.1,
+            14.4
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.1,
+            14.35,
+            120.15,
+            14.4
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.15,
+            14.35,
+            120.2,
+            14.4
+          ],
+          "population": 40
+        },
+        {
+          "bounds": [
+            120.2,
+            14.35,
+            120.25,
+            14.4
+          ],
+          "population": 25
+        },
+        {
+          "bounds": [
+            120.25,
+            14.35,
+            120.3,
+            14.4
+          ],
+          "population": 30
+        },
+        {
+          "bounds": [
+            120.3,
+            14.35,
+            120.35,
+            14.4
+          ],
+          "population": 35
+        },
+        {
+          "bounds": [
+            120.35,
+            14.35,
+            120.4,
+            14.4
+          ],
+          "population": 40
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "id": "ambient",
+        "title": "Synthetic daytime scenario",
+        "source": "JupyterLite-Population-Data-Comparison project; generated teaching fixture",
+        "citation": "JupyterLite-Population-Data-Comparison contributors (2026). Invented comparison cells, version 1.0. No observed population data.",
+        "license": "CC0-1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "year": 2020,
+        "version": "1.0",
+        "synthetic": true,
+        "units": "people/cell",
+        "crs": "EPSG:4326",
+        "resolution": "0.1 degree rectangular cells (invented)",
+        "population_concept": "Invented daytime scenario",
+        "allocation": "Invented redistribution toward a central activity area",
+        "census_vintage": "None; no census inputs",
+        "retrieval_date": "Not applicable; generated locally",
+        "publication_date": "2026-11-06",
+        "modifications": "Generated from deterministic arithmetic; no real data inputs",
+        "notice": "SYNTHETIC: not GPW, WorldPop, LandScan, HRSL, GHS-POP or Esri WPE."
+      },
+      "cells": [
+        {
+          "bounds": [
+            120.0,
+            14.0,
+            120.1,
+            14.1
+          ],
+          "population": 0
+        },
+        {
+          "bounds": [
+            120.1,
+            14.0,
+            120.2,
+            14.1
+          ],
+          "population": 0
+        },
+        {
+          "bounds": [
+            120.2,
+            14.0,
+            120.3,
+            14.1
+          ],
+          "population": 0
+        },
+        {
+          "bounds": [
+            120.3,
+            14.0,
+            120.4,
+            14.1
+          ],
+          "population": 0
+        },
+        {
+          "bounds": [
+            120.0,
+            14.1,
+            120.1,
+            14.2
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.1,
+            14.1,
+            120.2,
+            14.2
+          ],
+          "population": 200
+        },
+        {
+          "bounds": [
+            120.2,
+            14.1,
+            120.3,
+            14.2
+          ],
+          "population": 200
+        },
+        {
+          "bounds": [
+            120.3,
+            14.1,
+            120.4,
+            14.2
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.0,
+            14.2,
+            120.1,
+            14.3
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.1,
+            14.2,
+            120.2,
+            14.3
+          ],
+          "population": 200
+        },
+        {
+          "bounds": [
+            120.2,
+            14.2,
+            120.3,
+            14.3
+          ],
+          "population": 200
+        },
+        {
+          "bounds": [
+            120.3,
+            14.2,
+            120.4,
+            14.3
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.0,
+            14.3,
+            120.1,
+            14.4
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.1,
+            14.3,
+            120.2,
+            14.4
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.2,
+            14.3,
+            120.3,
+            14.4
+          ],
+          "population": 100
+        },
+        {
+          "bounds": [
+            120.3,
+            14.3,
+            120.4,
+            14.4
+          ],
+          "population": 100
+        }
+      ]
+    },
+    {
+      "metadata": {
+        "id": "partial",
+        "title": "Synthetic incomplete coverage",
+        "source": "JupyterLite-Population-Data-Comparison project; generated teaching fixture",
+        "citation": "JupyterLite-Population-Data-Comparison contributors (2026). Invented comparison cells, version 1.0. No observed population data.",
+        "license": "CC0-1.0",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "year": 2020,
+        "version": "1.0",
+        "synthetic": true,
+        "units": "people/cell",
+        "crs": "EPSG:4326",
+        "resolution": "0.1 degree rectangular cells (invented)",
+        "population_concept": "Invented residential scenario",
+        "allocation": "Invented counts with the northeast quadrant omitted as NoData",
+        "census_vintage": "None; no census inputs",
+        "retrieval_date": "Not applicable; generated locally",
+        "publication_date": "2026-11-06",
+        "modifications": "Generated from deterministic arithmetic; no real data inputs",
+        "notice": "SYNTHETIC: not GPW, WorldPop, LandScan, HRSL, GHS-POP or Esri WPE."
+      },
+      "cells": [
+        {
+          "bounds": [
+            120.0,
+            14.0,
+            120.1,
+            14.1
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.1,
+            14.0,
+            120.2,
+            14.1
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.2,
+            14.0,
+            120.3,
+            14.1
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.3,
+            14.0,
+            120.4,
+            14.1
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.0,
+            14.1,
+            120.1,
+            14.2
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.1,
+            14.1,
+            120.2,
+            14.2
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.2,
+            14.1,
+            120.3,
+            14.2
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.3,
+            14.1,
+            120.4,
+            14.2
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.0,
+            14.2,
+            120.1,
+            14.3
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.1,
+            14.2,
+            120.2,
+            14.3
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.0,
+            14.3,
+            120.1,
+            14.4
+          ],
+          "population": 80
+        },
+        {
+          "bounds": [
+            120.1,
+            14.3,
+            120.2,
+            14.4
+          ],
+          "population": 80
+        }
+      ]
+    }
+  ]
+}

@@ -1,12 +1,14 @@
 # JupyterLite-Population-Data-Comparison
 
+**[Read the Book](https://jltobias.github.io/JupyterLite-Population-Data-Comparison/book/intro.html) | [Open JupyterLite Lab](https://jltobias.github.io/JupyterLite-Population-Data-Comparison/lab/lab/index.html?path=01_introduction.ipynb) | [Launch Population-Data-Comparison-Viewer](https://jltobias.github.io/JupyterLite-Population-Data-Comparison/viewer/index.html)**
+
 ![Project concept: four aligned maps of an imaginary coastal region show district shading, coarse and fine population grids, and settlement patterns above a notebook and comparison chart.](assets/population-comparison-splash.png)
 
 **Compare population estimates, explore their assumptions, and reproduce the analysis in your browser.**
 
-JupyterLite-Population-Data-Comparison aims to recreate the visual and quantitative comparison workflows of **POPGRID Viewer** through a **Jupyter Book**, **JupyterLite Lab**, and executable browser notebooks. The project will connect these workflows with **RustGIS**, **GeoLibre**, and **JupyterGIS**, with the longer-term goal of becoming a population comparison widget within **[FieldWork](https://digital-twin-ph.github.io/fieldwork/)**.
+JupyterLite-Population-Data-Comparison implements an initial static teaching version of the visual and quantitative comparison workflows of **POPGRID Viewer** through a **Jupyter Book**, **JupyterLite Lab**, three executable browser notebooks, and a standalone **Population-Data-Comparison-Viewer**. The roadmap will connect these workflows with **RustGIS**, **GeoLibre**, and **JupyterGIS**, with the longer-term goal of becoming a population comparison widget within **[FieldWork](https://digital-twin-ph.github.io/fieldwork/)**.
 
-**Status: project introduction and implementation roadmap.** This repository currently contains this README and its splash illustration. The Book, Lab deployment, notebooks, GIS integrations, and FieldWork widget are planned. Launch links and build instructions will be added with working deployments.
+**Status: implemented synthetic teaching workspace.** The Book, Lab, and standalone viewer share deterministic invented count grids. The viewer provides four linked panels, independent layer selectors, cell inspection, rectangular area comparison, validated rectangular-cell GeoJSON import, coverage, charts, and CSV/JSON/SVG downloads with provenance. **All bundled population counts are synthetic; no real population product is connected.** GIS integrations, real raster workflows, district/polygon summaries, and a FieldWork widget remain planned.
 
 *The splash is an original AI-generated concept illustration with invented geography and illustrative marks. It is not a screenshot, a population dataset, or an analytical result. Generation details are recorded in [assets/README.md](assets/README.md).*
 
@@ -18,20 +20,20 @@ POPGRID Viewer brought together linked maps, population estimates for user-defin
 
 The scientific foundation is the **fitness for use** perspective in [Leyk et al. (2019)](https://doi.org/10.5194/essd-11-1385-2019): choose a population product according to the question, geography, time, population definition, and source-data quality. Finer output cells alone do not establish greater accuracy.
 
-This repository is an independent reimplementation under a new project name. It does not claim to be an official NASA, SEDAC, CIESIN, or POPGRID release. Historical viewer links are retained for attribution; the planned application should acquire data from documented, working sources rather than depend on the legacy viewer's services.
+This repository is an independent reimplementation under a new project name. It does not claim to be an official NASA, SEDAC, CIESIN, or POPGRID release. Historical viewer links are retained for attribution; future real-data integrations must acquire data from documented, working sources rather than depend on the legacy viewer's services.
 
-## What the project will offer
+## What works now
 
-| Planned capability | Intended experience |
+| Capability | Implemented experience |
 | --- | --- |
-| Four-panel comparison | Select population or contextual layers independently; synchronize map extent and zoom; inspect native pixel values with their units. |
-| Area-of-interest analysis | Draw a rectangle or polygon, or import a boundary; compare population estimates within the same geometry. |
-| District summaries | Recreate comparisons such as the Maputo, Mozambique example: consistent map panels plus population totals by administrative unit. |
-| Tables and charts | Compare totals, absolute differences, and explicitly defined percentage differences; export results with source information. |
-| Dataset context | Show product version, reference year, census vintage, native resolution, count/density units, population concept, allocation method, and attribution. |
-| Settlement context | Explore settlement footprints, urbanisation, and nighttime lights alongside population layers, with legends appropriate to each variable. |
-| Reproducible notebooks | Inspect the calculations, change parameters, rerun the analysis, and download notebooks and outputs. |
-| GIS handoffs | Exchange supported boundaries, results, and map projects with RustGIS, GeoLibre, and JupyterGIS. |
+| Four-panel comparison | Independently select synthetic or imported count layers; synchronize pan/zoom or navigate independently; inspect native cell counts, units, and source metadata. |
+| Rectangular area analysis | Draw a rectangle with two clicks, or enter WGS84 bounds. Use spherical overlap fractions with an explicit uniform-within-cell assumption. |
+| Coverage and results | Distinguish valid zero counts from NoData; show totals, usable coverage, cell counts, a table and chart. |
+| Portable exports | Download CSV, JSON and chart SVG with source, license, year, synthetic status, active bounds and method. Full supplied metadata survive in JSON, CSV `metadata_json`, and SVG descriptions; charts also show visible source credits. |
+| Validated count-grid import | Add small nonoverlapping rectangular GeoJSON cells with required source metadata; reject unsupported geometry, invalid/negative/nonfinite counts, oversized cells and files. See [the import contract](book/methods.md#import-contract). |
+| Reproducible notebooks | Run three standard-library Python lessons in browser Pyodide: introductory totals, area/coverage semantics, and import/export. The Book renders the same canonical notebooks. |
+
+The shared example rectangle produces **400, 400, 800, and 240** invented people across the four scenarios. The final scenario has incomplete coverage. These illustrate methodological sensitivity and do not establish that any product is correct. Polygon boundaries, administrative summaries, settlement context, real rasters, and GIS handoffs are future work.
 
 ## Population data sources
 
@@ -50,7 +52,7 @@ The years reproduce a documented historical comparison and are not a matched-yea
 
 Version-specific methods matter. [WorldPop's methods guide](https://www.worldpop.org/methods/) distinguishes land-cover allocation, random-forest redistribution, and bottom-up approaches; the selected 2014 asset's metadata must establish which method it used. As another example, [GHS-POP R2023A](https://human-settlement.emergency.copernicus.eu/ghs_pop2023.php) incorporates built-up volume and classification, so its method should not be described as identical to the earlier built-up-area allocation.
 
-**Integration status:** all six families are candidates for evaluation; no datasets are bundled or connected yet. Census boundaries and contextual settlement layers will complement them. Every supported asset will need a product identifier, version, reference year, population concept, units, CRS, resolution, input-census vintage, method, source citation, access URL, and applicable terms. Historical inclusion in POPGRID does not establish present download access or browser compatibility.
+**Integration status:** all six real-data families are candidates for evaluation; none is bundled or connected. The only count grids included are explicitly synthetic teaching fixtures. Census boundaries and contextual settlement layers will complement them. Every supported asset will need a product identifier, version, reference year, population concept, units, CRS, resolution, input-census vintage, method, source citation, access URL, and applicable terms. Historical inclusion in POPGRID does not establish present download access or browser compatibility.
 
 ## Data citations, attribution, and use requirements
 
@@ -60,11 +62,13 @@ Version-specific methods matter. [WorldPop's methods guide](https://www.worldpop
 
 | Repository material | Source and attribution status |
 | --- | --- |
-| `README.md` | Project description and summaries of the cited research, provider documentation, and related repositories. These are references to previous work; no population measurements or third-party map images are reproduced here. |
+| `README.md`, `book/`, `notebooks/` | Project description, research citations, executable teaching lessons and methods. No observed population measurements or third-party map images are reproduced. |
+| `data/demo.json`, `data/import-example.geojson` | Deterministic invented teaching cells, version 1.0; CC0-1.0. No census, imagery, population, basemap or boundary inputs. [Generation, checksum and license record](data/README.md). Every layer and export records synthetic status. |
+| `viewer/`, `scripts/`, `tests/`, `.github/workflows/` | Static comparison app, allowlisted paired-site build, analytical/browser checks, and GitHub Pages deployment. Original project code is [MIT licensed](LICENSE); that license does not relicense third-party data or software. |
 | `assets/population-comparison-splash.png` | Project illustration generated with OpenAI's built-in image-generation tool. Its geography and marks are invented. The [image record](assets/README.md) includes the generation date, full prompt, and alternative description. It uses no external population, boundary, imagery, or basemap dataset. |
 | `assets/README.md` | Provenance and prompt for the splash illustration. |
-| Population grids, census boundaries, settlement rasters, nighttime lights, and basemap tiles | **Not included, downloaded, or queried by this repository.** The six families above are historical references and future integration candidates. No asset-level data-use clearance is claimed for them. |
-| Third-party software | Referenced as related work or planned dependencies; no third-party source code or software distribution is bundled at this stage. |
+| Real population grids, census boundaries, settlement rasters, nighttime lights, and basemap tiles | **Not included, downloaded, or queried by this repository.** The six families above are historical references and future integration candidates. No asset-level data-use clearance is claimed for them. |
+| Third-party software | Leaflet 1.9.4 is bundled with its [BSD-2-Clause license](viewer/vendor/leaflet/LICENSE), copyright Vladimir Agafonkin and CloudMade. The build produces Jupyter Book and JupyterLite/Pyodide assets, retaining upstream notices. See [requirements.txt](requirements.txt). RustGIS, GeoLibre, JupyterGIS, and FieldWork are references or future integrations. |
 
 A citation to POPGRID Viewer, this repository, a methods paper, or a hosting mirror does **not** replace the citation and use terms of the dataset actually used. A reference year such as 2015 is not a publication date or release identifier. Keep the original producer's credit when data move to another host.
 
@@ -85,7 +89,7 @@ For material actually supplied under [CC BY 4.0](https://creativecommons.org/lic
 
 ### Boundaries, context layers, and basemaps
 
-No providers have yet been selected for administrative boundaries, settlement footprints, urbanisation, nighttime lights, or basemaps. Their citations cannot be inferred from the population source or from the earlier POPGRID screenshot. Add the following when those layers are selected:
+No providers have yet been selected for real administrative boundaries, settlement footprints, urbanisation, nighttime lights, or basemaps. The current viewer draws synthetic count cells locally without a basemap service. Their citations cannot be inferred from the population source or from the earlier POPGRID screenshot. Add the following when those layers are selected:
 
 - **Administrative boundaries and census tables:** issuing statistical or mapping agency, collection/title, administrative level, vintage, version, source URL, and its actual use terms. Preserve the credits and notices of any boundary distributor as well as the underlying producer when required.
 - **Settlement, built-up, and urbanisation layers:** cite the specific product, such as GHS-BUILT or GHS-SMOD, independently of GHS-POP; a population-product citation does not cover separate input layers downloaded for this project. Identify the actual World Settlement Footprint release if one is chosen.
@@ -104,15 +108,30 @@ Before adding a file, enabling a live source, or publishing a derived result, ma
 
 ## Read, run, and explore
 
-The planned learning route has three connected parts:
+The learning route has three connected parts:
 
-1. **Read the Jupyter Book.** Learn how population grids are made, how products differ, and how to interpret a comparison.
-2. **Run the same notebooks in JupyterLite Lab.** Select a study area and datasets, calculate summaries, inspect intermediate results, and export a reproducible comparison.
-3. **Continue in a browser GIS.** Explore supported outputs in RustGIS Web, GeoLibre, or JupyterGIS, retaining their source and method metadata.
+1. **Read the Book.** Follow the three rendered notebooks and the method, coverage, import and provenance explanations.
+2. **Run the same notebooks in JupyterLite Lab.** Choose **Run → Run All Cells**. The introductory notebook asserts the shared teaching totals; the export notebook creates downloadable files in `outputs`.
+3. **Explore the standalone viewer.** Select independent grids, define a rectangle, inspect coverage, import supported count cells and export results.
 
-An initial notebook sequence will cover dataset discovery and provenance, linked map panels, area-of-interest totals, district summaries, interpretation of differences, GIS exports, and a proposed FieldWork handoff. Small attributed sample windows and clearly labelled synthetic exercises will provide a manageable starting point before larger remote-data workflows.
+The first Lab kernel start needs a connection to retrieve its pinned Pyodide runtime and kernel packages. Population calculations use bundled files and do not call remote population services. Browser storage holds your Lab changes and outputs; download files to keep them. The current site does not promise a prepared offline Lab environment. RustGIS Web, GeoLibre, JupyterGIS and FieldWork handoffs remain future validation work.
 
-The [Jupyter Book](https://jupyterbook.org/stable/) will explain and render the material; [JupyterLite](https://jupyterlite.readthedocs.io/en/stable/) will provide the in-browser computing environment. Browser-compatible packages, extensions, and datasets will be selected and tested as implementation proceeds.
+### Build and verify locally
+
+Use Python 3.12 or 3.13. Native Node/npm are not required.
+
+```powershell
+python -m pip install -r requirements.txt
+python -m playwright install chromium
+python -m unittest discover -s tests -v
+python scripts/build_site.py
+python scripts/check_browser.py
+python -m http.server 8000 --directory _site
+```
+
+Open `http://localhost:8000/` for the local workspace. The browser check mounts it at `/JupyterLite-Population-Data-Comparison/` to verify GitHub Pages prefix handling, exercises viewer interactions and downloads, and executes the actual introductory JupyterLite notebook in Chromium. The Book build also executes all three canonical notebooks. On Windows, kernel/browser subprocesses may need an environment that permits launching child processes.
+
+`scripts/build_site.py` copies approved course assets into `_site` and excludes development metadata and machine configuration. It builds the Book and Lab from canonical `notebooks/` and `data/` files; `_site/publication.json` records their hashes. `.github/workflows/deploy.yml` repeats checks and builds, uploads `_site`, and deploys GitHub Pages on pushes to `main`. Set the repository's Pages source to **GitHub Actions**. The Lab runtime is served by the installed pinned Pyodide extension; initial runtime downloads require network access.
 
 ## Browser GIS ecosystem and related repositories
 
@@ -161,10 +180,11 @@ Dataset acquisition should be separated from calculation so a run can use prepar
 ## Roadmap
 
 - [x] Introduce the project, acknowledge prior work, and add the splash image.
-- [ ] Build and publish the Jupyter Book and JupyterLite Lab from shared notebook sources.
+- [x] Build the Jupyter Book and JupyterLite Lab from shared notebook sources and add GitHub Pages publication.
 - [ ] Create a versioned source inventory for all six historical population families and verify access, terms, units, and browser compatibility for selected assets.
-- [ ] Add a small reproducible population-comparison example with source metadata and expected totals.
-- [ ] Implement linked panels, boundary input, district summaries, and downloadable tables and charts.
+- [x] Add a small reproducible synthetic population-comparison example with source metadata and expected totals.
+- [x] Implement linked panels, rectangular boundary input, coverage, and downloadable tables and charts.
+- [ ] Add polygon boundaries and administrative district summaries.
 - [ ] Verify browser workflows with RustGIS, GeoLibre, and JupyterGIS.
 - [ ] Validate real-data comparisons across products, including coverage and boundary handling.
 - [ ] Develop and validate the FieldWork integration against the host's current widget contracts.
@@ -201,7 +221,7 @@ These records document candidate sources and citation requirements. They are not
 ### Software and related work
 
 - **Project Jupyter and contributors:** [JupyterLite](https://jupyterlite.readthedocs.io/en/stable/) and [JupyterGIS / GeoJupyter](https://jupytergis.readthedocs.io/en/latest/).
-- **Pyodide contributors:** [Pyodide documentation](https://pyodide.org/en/stable/) and [source](https://github.com/pyodide/pyodide), the proposed browser Python runtime.
+- **Pyodide contributors:** [Pyodide documentation](https://pyodide.org/en/stable/) and [source](https://github.com/pyodide/pyodide), the browser Python runtime used by the teaching notebooks.
 - **Jupyter Book and MyST contributors:** [Jupyter Book documentation](https://jupyterbook.org/stable/).
 - **Wu, Q. (2026).** *GeoLibre.* [DOI: 10.5281/zenodo.20785400](https://doi.org/10.5281/zenodo.20785400) · [upstream recommended citation](https://github.com/opengeos/GeoLibre/blob/main/CITATION.cff). The citation file identifies MIT licensing; cite the version actually used when integrated.
 - **Wu, Q., Rincón Albarracín, J. G., Filho, E., Hofbauer, D., Fitzgerald, M., and Strebel, D. (2026).** *RustGIS: A fast, free and open-source GIS in pure Rust for mapping, analyzing and sharing geospatial data.* [DOI: 10.5281/zenodo.23633281](https://doi.org/10.5281/zenodo.23633281) · [upstream recommended citation](https://github.com/opengeos/RustGIS/blob/main/CITATION.cff). The citation file identifies Apache-2.0 licensing; cite the version actually used when integrated.

@@ -1,0 +1,554 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "id": "synthetic-import-example",
+    "title": "Synthetic imported uniform grid",
+    "source": "JupyterLite-Population-Data-Comparison project; generated teaching fixture",
+    "citation": "JupyterLite-Population-Data-Comparison contributors (2026). Invented comparison cells, version 1.0. No observed population data.",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "year": 2020,
+    "version": "1.0",
+    "synthetic": true,
+    "units": "people/cell",
+    "crs": "EPSG:4326",
+    "resolution": "0.1 degree rectangular cells (invented)",
+    "population_concept": "Invented residential scenario",
+    "allocation": "Equal allocation within each invented census zone",
+    "census_vintage": "None; no census inputs",
+    "retrieval_date": "Not applicable; generated locally",
+    "publication_date": "2026-11-06",
+    "modifications": "Generated from deterministic arithmetic; no real data inputs",
+    "notice": "SYNTHETIC: not GPW, WorldPop, LandScan, HRSL, GHS-POP or Esri WPE."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.0,
+              14.0
+            ],
+            [
+              120.1,
+              14.0
+            ],
+            [
+              120.1,
+              14.1
+            ],
+            [
+              120.0,
+              14.1
+            ],
+            [
+              120.0,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.1,
+              14.0
+            ],
+            [
+              120.2,
+              14.0
+            ],
+            [
+              120.2,
+              14.1
+            ],
+            [
+              120.1,
+              14.1
+            ],
+            [
+              120.1,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.2,
+              14.0
+            ],
+            [
+              120.3,
+              14.0
+            ],
+            [
+              120.3,
+              14.1
+            ],
+            [
+              120.2,
+              14.1
+            ],
+            [
+              120.2,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.3,
+              14.0
+            ],
+            [
+              120.4,
+              14.0
+            ],
+            [
+              120.4,
+              14.1
+            ],
+            [
+              120.3,
+              14.1
+            ],
+            [
+              120.3,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.0,
+              14.1
+            ],
+            [
+              120.1,
+              14.1
+            ],
+            [
+              120.1,
+              14.2
+            ],
+            [
+              120.0,
+              14.2
+            ],
+            [
+              120.0,
+              14.1
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.1,
+              14.1
+            ],
+            [
+              120.2,
+              14.1
+            ],
+            [
+              120.2,
+              14.2
+            ],
+            [
+              120.1,
+              14.2
+            ],
+            [
+              120.1,
+              14.1
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.2,
+              14.1
+            ],
+            [
+              120.3,
+              14.1
+            ],
+            [
+              120.3,
+              14.2
+            ],
+            [
+              120.2,
+              14.2
+            ],
+            [
+              120.2,
+              14.1
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.3,
+              14.1
+            ],
+            [
+              120.4,
+              14.1
+            ],
+            [
+              120.4,
+              14.2
+            ],
+            [
+              120.3,
+              14.2
+            ],
+            [
+              120.3,
+              14.1
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.0,
+              14.2
+            ],
+            [
+              120.1,
+              14.2
+            ],
+            [
+              120.1,
+              14.3
+            ],
+            [
+              120.0,
+              14.3
+            ],
+            [
+              120.0,
+              14.2
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.1,
+              14.2
+            ],
+            [
+              120.2,
+              14.2
+            ],
+            [
+              120.2,
+              14.3
+            ],
+            [
+              120.1,
+              14.3
+            ],
+            [
+              120.1,
+              14.2
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.2,
+              14.2
+            ],
+            [
+              120.3,
+              14.2
+            ],
+            [
+              120.3,
+              14.3
+            ],
+            [
+              120.2,
+              14.3
+            ],
+            [
+              120.2,
+              14.2
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.3,
+              14.2
+            ],
+            [
+              120.4,
+              14.2
+            ],
+            [
+              120.4,
+              14.3
+            ],
+            [
+              120.3,
+              14.3
+            ],
+            [
+              120.3,
+              14.2
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.0,
+              14.3
+            ],
+            [
+              120.1,
+              14.3
+            ],
+            [
+              120.1,
+              14.4
+            ],
+            [
+              120.0,
+              14.4
+            ],
+            [
+              120.0,
+              14.3
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.1,
+              14.3
+            ],
+            [
+              120.2,
+              14.3
+            ],
+            [
+              120.2,
+              14.4
+            ],
+            [
+              120.1,
+              14.4
+            ],
+            [
+              120.1,
+              14.3
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.2,
+              14.3
+            ],
+            [
+              120.3,
+              14.3
+            ],
+            [
+              120.3,
+              14.4
+            ],
+            [
+              120.2,
+              14.4
+            ],
+            [
+              120.2,
+              14.3
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              120.3,
+              14.3
+            ],
+            [
+              120.4,
+              14.3
+            ],
+            [
+              120.4,
+              14.4
+            ],
+            [
+              120.3,
+              14.4
+            ],
+            [
+              120.3,
+              14.3
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "population": 100
+      }
+    }
+  ]
+}

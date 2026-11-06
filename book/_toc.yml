@@ -1,0 +1,8 @@
+format: jb-book
+root: intro
+chapters:
+  - file: 01_introduction
+  - file: 02_area_and_coverage
+  - file: 03_import_and_export
+  - file: methods
+  - file: credits
