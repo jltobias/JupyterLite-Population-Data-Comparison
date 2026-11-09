@@ -59,3 +59,61 @@ for(const layer of [compact,...data.layers]){
   for(const [lon,lat] of [[e,n],[w,s],[w-g.dx/100,n],[w,n+g.dy/100],[e+g.dx/100,n],[w,s-g.dy/100]])assert.equal(a.inspectCell(layer,lon,lat),null);
 }
 console.log('Native inspection second rows, exact edges and geographic half-open bounds: PASS');
+
+// Independent spherical-area fixtures distinguish area weighting from pixel ranks.
+const referenceArea=([w,s,e,n])=>6371.0088**2*(e-w)*Math.PI/180*(Math.sin(n*Math.PI/180)-Math.sin(s*Math.PI/180));
+const densityCell=(bounds,value)=>({bounds,population:value*referenceArea(bounds)});
+const scope=[0,0,1,1];
+const weighted={metadata:{id:'weighted'},cells:[
+  densityCell([0,0,.35,1],10),densityCell([.35,0,.45,1],20),densityCell([.45,0,.55,1],30),densityCell([.55,0,.65,1],40),densityCell([.65,0,1,1],50)
+]};
+const near=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-9,`${actual} != ${expected}`);
+const shared=a.classifyDensity([weighted],scope);
+shared.thresholds.forEach((v,i)=>near(v,[10,20,40,50][i]));
+assert.deepEqual(a.DENSITY_COLORS,['#ffffd4','#fed98e','#fe9929','#d95f0e','#993404']);
+const subdivided=structuredClone(weighted);subdivided.metadata.id='fine';
+subdivided.cells=weighted.cells.flatMap(cell=>{
+  const [w,s,e,n]=cell.bounds,value=cell.population/referenceArea(cell.bounds);
+  return Array.from({length:10},(_,i)=>densityCell([w+(e-w)*i/10,s,w+(e-w)*(i+1)/10,n],value));
+});
+a.classifyDensity([subdivided],scope).thresholds.forEach((v,i)=>near(v,shared.thresholds[i]));
+assert.deepEqual(a.classifyDensity([weighted,weighted],scope),shared);
+const coarse={metadata:{id:'coarse'},cells:[densityCell(scope,100)]};
+const fine={metadata:{id:'fine-low'},cells:Array.from({length:100},(_,i)=>densityCell([i/100,0,(i+1)/100,1],1))};
+a.classifyDensity([fine,coarse],scope).thresholds.forEach((v,i)=>near(v,[1,1,100,100][i]));
+const equalArea={metadata:{id:'equal-area'},cells:Array.from({length:5},(_,i)=>densityCell([i,0,i+1,1],i+1))};
+a.classifyDensity([equalArea],[0,0,5,1]).thresholds.forEach((v,i)=>near(v,i+1));
+const equatorial={metadata:{id:'equatorial'},cells:[densityCell(scope,10)]};
+const highLatitude={metadata:{id:'high-latitude'},cells:[densityCell(scope,0),densityCell([0,60,1,61],100)]};
+const latitudeClasses=a.classifyDensity([equatorial,highLatitude],[0,0,1,61]);
+latitudeClasses.thresholds.forEach((v,i)=>near(v,[10,10,10,100][i]));
+assert.deepEqual(a.classifyDensity([highLatitude,equatorial],[0,0,1,61]).thresholds,latitudeClasses.thresholds);
+const pair={metadata:{id:'pair'},cells:[densityCell([0,0,.5,1],10),densityCell([.5,0,1,1],100)]};
+a.classifyDensity([pair],[.45,0,1,1]).thresholds.forEach(v=>near(v,100));
+const tied={metadata:{id:'tied'},cells:[densityCell(scope,25)]};
+const ties=a.classifyDensity([tied],scope);
+assert.ok(ties.thresholds.every(v=>v===ties.thresholds[0]));
+assert.equal(a.densityColor(ties.thresholds[0],ties),a.DENSITY_COLORS[0]);
+const exact={thresholds:[10,20,30,40]};
+for(const [value,color] of [[0,a.ZERO_DENSITY_COLOR],[1,a.DENSITY_COLORS[0]],[10,a.DENSITY_COLORS[0]],[10.001,a.DENSITY_COLORS[1]],[20,a.DENSITY_COLORS[1]],[30,a.DENSITY_COLORS[2]],[40,a.DENSITY_COLORS[3]],[40.001,a.DENSITY_COLORS[4]],[null,null]])assert.equal(a.densityColor(value,exact),color);
+assert.deepEqual(a.classifyDensity([compact],[-1,-1,0,0]).thresholds,[]);
+const empty={metadata:{id:'empty'},grid:{width:2,height:1,west:0,north:1,dx:.5,dy:1,values:[0,null]}};
+assert.deepEqual(a.classifyDensity([empty],scope).thresholds,[]);
+assert.equal(a.densityColor(1,a.classifyDensity([],scope)),a.DENSITY_COLORS[0]);
+assert.equal(a.densityColor(0,a.classifyDensity([],scope)),a.ZERO_DENSITY_COLOR);
+const originalCounts=structuredClone(data.layers.map(layer=>layer.grid.values));
+const realClasses=a.classifyDensity(data.layers,data.default_aoi);
+assert.equal(realClasses.thresholds.length,4);
+assert.ok(realClasses.thresholds.every((value,i)=>value>0&&(i===0||value>=realClasses.thresholds[i-1])));
+assert.deepEqual(data.layers.map(layer=>layer.grid.values),originalCounts);
+assert.throws(()=>a.densityColor(Infinity,exact),/finite/);
+for(const [cell,expected] of [[{bounds:[0,0,5,5],population:Number.MIN_VALUE},Number.MIN_VALUE],[{bounds:[0,0,1e-100,1],population:1e300},Number.MAX_VALUE]]){
+  const extreme=a.validateLayer({metadata,cells:[cell]});
+  const native=cell.population,display=a.classifyDensity([extreme],cell.bounds);
+  assert.equal(a.cellDensity(native,cell.bounds),expected);
+  assert.ok(display.thresholds.every(value=>value===expected));
+  assert.notEqual(a.densityColor(expected,display),a.ZERO_DENSITY_COLOR);
+  assert.equal(a.compare([extreme],cell.bounds)[0].population,native);
+  assert.ok(JSON.stringify(display));
+}
+console.log('Shared area-weighted density quantiles, subdivision, clipping, ties, palette and zero/NoData: PASS');

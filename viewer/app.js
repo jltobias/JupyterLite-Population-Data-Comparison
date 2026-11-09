@@ -1,9 +1,9 @@
-import {METHOD,validateBounds,validateLayer,importGeoJSON,compare,exportCSV,layerBounds,area,inspectCell,planWindow,WindowCache} from './analysis.js';
+import {METHOD,validateBounds,validateLayer,importGeoJSON,compare,exportCSV,layerBounds,area,inspectCell,planWindow,WindowCache,cellDensity,classifyDensity,densityColor,DENSITY_COLORS,ZERO_DENSITY_COLOR} from './analysis.js';
 const $=id=>document.getElementById(id), fmt=value=>value===null?'No coverage':value.toLocaleString(undefined,{maximumFractionDigits:2});
 const ll=b=>[[b[1],b[0]],[b[3],b[2]]];
 function inputBounds(ids){return validateBounds(ids.map(id=>{const input=$(id);if(!input.value.trim()||input.validity.badInput||!Number.isFinite(input.valueAsNumber))throw Error('Enter all four finite coordinates.');return input.valueAsNumber;}));}
 function idTaken(id){return demo.sources.some(source=>source.metadata.id===id)||layers.some(layer=>layer.metadata.id===id);}
-let layers=[], maps=[], grids=[], rectangles=[], draftRectangles=[], results=[], bounds, draftBounds, demo, overview, overviewFrame, overviewAOI, moving=false, drawing=false, firstCorner=null,job=null,cancelImport=()=>{},comparisonUse='load';
+let layers=[], maps=[], grids=[], rectangles=[], draftRectangles=[], results=[], bounds, draftBounds, classification, demo, overview, overviewFrame, overviewAOI, moving=false, drawing=false, firstCorner=null,job=null,cancelImport=()=>{},comparisonUse='load';
 const cache=new WindowCache(),bytes=n=>`${(n/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB`;
 let acquiredIds=new Set();
 let editGeneration=0;
@@ -14,51 +14,77 @@ function removeBundleClaims(metadata){
 }
 const fail=message=>{ $('error').textContent=message; $('error').hidden=false; };
 const clearError=()=>{ if(!window.populationAssetError)$('error').hidden=true; };
-function selectedLayers(){return [...new Set(maps.map((_,i)=>$(`layer-${i}`).value))].map(id=>layers.find(l=>l.metadata.id===id)).filter(Boolean);}
+function panelLayers(){return maps.map((_,i)=>layers.find(l=>l.metadata.id===$(`layer-${i}`).value)).filter(Boolean);}
+function selectedLayers(){return [...new Set(panelLayers())];}
 function extent(layersToFit){return layersToFit.map(layerBounds).reduce((a,b)=>[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(a[2],b[2]),Math.max(a[3],b[3])],[Infinity,Infinity,-Infinity,-Infinity]);}
 function textNode(tag,text){const node=document.createElement(tag);node.textContent=text;return node;}
-const colors=['#eef3df','#b3d7ae','#66b79e','#258577','#12525b','#103445'];
-function densityColor(value){return colors[value===0?0:Math.min(5,Math.max(1,Math.ceil(Math.log10(Math.max(1,value)))) )];}
+function prepareDisplay(selected,region){
+  const next=classifyDensity(selected,region);
+  for(const layer of new Set(selected)){
+    if(layer.grid)gridImage(layer,next);
+    else for(const cell of layer.cells)cellDensity(cell.population,cell.bounds);
+  }
+  return next;
+}
+function renderLegend(index){
+  const legend=$(`legend-${index}`),breaks=classification.thresholds;
+  legend.replaceChildren(textNode('strong','Shared modified quantiles · people/km²'));
+  const entries=document.createElement('div');entries.className='legend-classes';
+  const rounded=value=>value.toLocaleString(undefined,{maximumSignificantDigits:8});
+  const format=value=>breaks.some(other=>other!==value&&rounded(other)===rounded(value))?String(value):rounded(value);
+  DENSITY_COLORS.forEach((color,i)=>{
+    let label;
+    if(!breaks.length)label=i===0?'Positive cells outside study bounds':'No positive study data';
+    else if(i===0)label=`> 0 – ≤ ${format(breaks[0])}`;
+    else if(i===4)label=`> ${format(breaks[3])}`;
+    else label=breaks[i]===breaks[i-1]?'Empty (tied break)':`> ${format(breaks[i-1])} – ≤ ${format(breaks[i])}`;
+    const entry=textNode('span',label),swatch=document.createElement('span');entry.className='legend-class';swatch.className='legend-swatch';swatch.style.backgroundColor=color;swatch.setAttribute('aria-hidden','true');entry.prepend(swatch);entries.append(entry);
+  });
+  const zero=textNode('span','0 (valid count)'),swatch=document.createElement('span');zero.className='legend-class';swatch.className='legend-swatch legend-zero';swatch.style.backgroundColor=ZERO_DENSITY_COLOR;swatch.setAttribute('aria-hidden','true');zero.prepend(swatch);entries.append(zero);
+  legend.append(entries,textNode('span',breaks.length?'Area-weighted across selected sources in study bounds; ties stay together. Unshaded: NoData / outside grid.':'No positive density in study bounds; positive cells outside use the lightest color. Unshaded: NoData / outside grid.'));
+}
 function inspect(index,lon,lat){
   const layer=layers.find(l=>l.metadata.id===$(`layer-${index}`).value);if(!layer)return;const cell=inspectCell(layer,lon,lat);
   $('inspection').textContent=cell?`${layer.metadata.title} · ${layer.metadata.year} · ${layer.metadata.population_concept}\nNative cell: ${cell.bounds.join(', ')} (west, south, east, north)${cell.row===undefined?'':` · row ${cell.row}, column ${cell.column}`}\nCount: ${cell.population===null?'NoData (not zero)':fmt(cell.population)+' people/cell'}\n${cell.population===null?layer.metadata.nodata_semantics:`Density for display: ${fmt(cell.population/(area(cell.bounds)*6371.0088**2))} people/km²`}\nSource: ${layer.metadata.source}\n${layer.metadata.citation} · License: ${layer.metadata.license}`:`${layer.metadata.title}: outside the loaded native window. Choose bounds and acquire another compatible window.`;
 }
-function gridImage(layer){
-  if(rasterImages.has(layer))return rasterImages.get(layer);
+function gridImage(layer,display){
+  const key=JSON.stringify(display.thresholds),cached=rasterImages.get(layer);
+  if(cached?.key===key)return cached.url;
   if(layer.grid){
     if(layer.grid.width>32767||layer.grid.height>32767)throw Error('Native display axes are limited to 32767 pixels. Choose a smaller native window; no resampling is performed.');
     const g=layer.grid,canvas=document.createElement('canvas');canvas.width=g.width;canvas.height=g.height;
     const ctx=canvas.getContext('2d'),image=ctx.createImageData(g.width,g.height);
     for(let y=0;y<g.height;y++){
-      const cellArea=area([g.west,g.north-(y+1)*g.dy,g.west+g.dx,g.north-y*g.dy])*6371.0088**2;
       for(let x=0;x<g.width;x++){
         const value=g.values[y*g.width+x];if(value===null)continue;
-        const color=densityColor(value/cellArea),offset=(y*g.width+x)*4;
-        image.data[offset]=parseInt(color.slice(1,3),16);image.data[offset+1]=parseInt(color.slice(3,5),16);image.data[offset+2]=parseInt(color.slice(5,7),16);image.data[offset+3]=235;
+        const color=densityColor(cellDensity(value,[g.west+x*g.dx,g.north-(y+1)*g.dy,g.west+(x+1)*g.dx,g.north-y*g.dy]),display),offset=(y*g.width+x)*4;
+        image.data[offset]=parseInt(color.slice(1,3),16);image.data[offset+1]=parseInt(color.slice(3,5),16);image.data[offset+2]=parseInt(color.slice(5,7),16);image.data[offset+3]=255;
       }
     }
     ctx.putImageData(image,0,0);
     const url=canvas.toDataURL('image/png');if(!url.startsWith('data:image/png'))throw Error('The native grid cannot be serialized for display. Choose a smaller window.');
-    rasterImages.set(layer,url);return url;
+    rasterImages.set(layer,{key,url});return url;
   }
 }
 function renderLayer(index){
-  const layer=layers.find(l=>l.metadata.id===$(`layer-${index}`).value),url=gridImage(layer);
+  const layer=layers.find(l=>l.metadata.id===$(`layer-${index}`).value),url=gridImage(layer,classification);
   if(grids[index])grids[index].remove();
   if(layer.grid){
     grids[index]=L.imageOverlay(url,ll(layerBounds(layer)),{interactive:false,className:'native-grid',alt:`${layer.metadata.title}, native count grid shown as people per square kilometre`}).addTo(maps[index]);
   }else{
-    grids[index]=L.layerGroup(layer.cells.map(cell=>L.rectangle(ll(cell.bounds),{color:'#416b64',weight:.5,fillColor:densityColor(cell.population/(area(cell.bounds)*6371.0088**2)),fillOpacity:.9,interactive:false}))).addTo(maps[index]);
+    grids[index]=L.layerGroup(layer.cells.map(cell=>L.rectangle(ll(cell.bounds),{stroke:false,fillColor:densityColor(cellDensity(cell.population,cell.bounds),classification),fillOpacity:1,interactive:false}))).addTo(maps[index]);
   }
-  const legend=$(`legend-${index}`);legend.replaceChildren(textNode('span','0'),Object.assign(document.createElement('span'),{className:'legend-ramp'}),textNode('span','≤10 · ≤100 · ≤1k · ≤10k · >10k people/km²'),textNode('span','Unshaded: NoData / outside grid. Zero: pale.'));
+  $(`layer-${index}`).dataset.committed=layer.metadata.id;
+  renderLegend(index);
   const metadata=$(`metadata-${index}`);metadata.replaceChildren();
   for (const [key,value] of Object.entries(layer.metadata)){metadata.append(textNode('dt',key.replaceAll('_',' ')),textNode('dd',value!==null&&typeof value==='object'?JSON.stringify(value):String(value)));}
   if(rectangles[index]) rectangles[index].bringToFront();
 }
 function updateOverview(){if(overviewFrame){overviewFrame.setBounds(maps[0].getBounds());const frame=maps[0].getBounds();overview.fitBounds(L.latLngBounds(ll(layers.length?extent(selectedLayers()):demo.bounds)).extend(frame),{padding:[6,6],animate:false});}}
-function updateBounds(next){
+function updateBounds(next,display){
   const valid=validateBounds(next); // Validate completely before changing the active analysis.
-  bounds=valid;
+  const prepared=display||prepareDisplay(panelLayers(),valid);
+  bounds=valid;classification=prepared;maps.forEach((_,i)=>renderLayer(i));
   maps.forEach((map,i)=>{if(rectangles[i])rectangles[i].setBounds(ll(valid));else rectangles[i]=L.rectangle(ll(valid),{color:'#176bc0',weight:2.5,fill:false,interactive:false}).addTo(map);});
   if(overviewAOI)overviewAOI.setBounds(ll(valid));
   else overviewAOI=L.rectangle(ll(valid),{color:'#176bc0',weight:2,fill:false,interactive:false}).addTo(overview);
@@ -112,12 +138,12 @@ async function loadComparison(){
         if(job!==current)throw Error('Stale comparison discarded.');
         cache.set(key,data);
       }
-      const layer=validateLayer({metadata:{...structuredClone(source.metadata),acquisition:data.acquisition},grid:data.grid});gridImage(layer);staged.push(layer);
+      const layer=validateLayer({metadata:{...structuredClone(source.metadata),acquisition:data.acquisition},grid:data.grid});staged.push(layer);
     }
     if(job!==current)throw Error('Stale comparison discarded.');
-    compare(staged,region); // All values, images and totals pass before one visible commit.
+    const display=prepareDisplay(staged,region);compare(staged,region); // All values, images and totals pass before one visible commit.
     layers=[...staged,...layers.filter(layer=>!bundledLayers.has(layer))];staged.forEach(layer=>bundledLayers.add(layer));
-    addOptions();maps.forEach((_,i)=>{$(`layer-${i}`).value=staged[i].metadata.id;renderLayer(i);});comparisonUse='load';acquiredIds=new Set(staged.filter(l=>!l.metadata.acquisition.cache_reused).map(l=>l.metadata.id));updateBounds(region);maps.forEach(map=>map.fitBounds(ll(region),{animate:false}));updateOverview();
+    addOptions();maps.forEach((_,i)=>{$(`layer-${i}`).value=staged[i].metadata.id;});comparisonUse='load';acquiredIds=new Set(staged.filter(l=>!l.metadata.acquisition.cache_reused).map(l=>l.metadata.id));updateBounds(region,display);maps.forEach(map=>map.fitBounds(ll(region),{animate:false}));updateOverview();
     const transfer=[...current.progress.values()].reduce((sum,p)=>sum+p.actual_bytes,0);
     $('status').textContent=`Loaded four native windows. Actual transfer ${bytes(transfer)}; ${staged.filter(l=>l.metadata.acquisition.cache_reused).length}/4 windows reused from bounded session cache. Active results use the exact study box.`;
   }catch(error){if(job===current){fail('Comparison load rejected: '+error.message+' Previous valid comparison retained.');$('status').textContent='Comparison not replaced.';}}
@@ -125,7 +151,7 @@ async function loadComparison(){
 }
 function renderResults(){
   results=compare(selectedLayers(),bounds);
-  for(const result of results)result.metadata.comparison_context={requested_bounds:bounds.slice(),use:comparisonUse,cache_reused:!!result.metadata.acquisition?.cache_reused,new_pixels_read:acquiredIds.has(result.metadata.id),actual_bytes_for_this_comparison:acquiredIds.has(result.metadata.id)?result.metadata.acquisition?.actual_bytes||0:0};
+  for(const result of results){result.metadata.display_classification=structuredClone(classification);result.metadata.comparison_context={requested_bounds:bounds.slice(),use:comparisonUse,cache_reused:!!result.metadata.acquisition?.cache_reused,new_pixels_read:acquiredIds.has(result.metadata.id),actual_bytes_for_this_comparison:acquiredIds.has(result.metadata.id)?result.metadata.acquisition?.actual_bytes||0:0};}
   for(const id of ['csv','json','svg','reset','compare-loaded'])$(id).disabled=!layers.length;
   document.querySelectorAll('.panel-head select,.panel-head button').forEach(el=>el.disabled=!layers.length);
   $('area-description').textContent=`Active bounds: ${bounds.join(', ')} (W, S, E, N). Method: ${METHOD}.`;
@@ -194,8 +220,9 @@ function setupRasterImport(){
           const layer=validateLayer({metadata:{...metadata,file_declarations:data.file_declarations,acquisition:data.acquisition,import_extent:region,provenance_status:'User-declared source metadata; TIFF structure checked, source identity not independently verified'},grid:data.grid});
           if(idTaken(metadata.id))throw Error('That id is reserved or was added while reading; choose a unique id.');
           if(layers.length>=16)throw Error('At most 16 layers may be loaded.');
-          gridImage(layer);compare([layer],region);
-          const initial=!layers.length;layers.push(layer);addOptions();$('layer-0').value=layer.metadata.id;if(initial)maps.forEach((_,i)=>renderLayer(i));else renderLayer(0);comparisonUse='import';acquiredIds=new Set([layer.metadata.id]);updateBounds(region);maps[0].fitBounds(ll(layerBounds(layer)),{animate:false});updateOverview();clearError();
+          const selected=layers.length?panelLayers():Array(4).fill(layer);selected[0]=layer;
+          const display=prepareDisplay(selected,region);compare([layer],region);
+          layers.push(layer);addOptions();$('layer-0').value=layer.metadata.id;comparisonUse='import';acquiredIds=new Set([layer.metadata.id]);updateBounds(region,display);maps[0].fitBounds(ll(layerBounds(layer)),{animate:false});updateOverview();clearError();
           $('raster-status').textContent=`Loaded ${data.grid.width} x ${data.grid.height} native cells. ${planText(data.plan)}. Actual ${remote?'transfer':'local reads'} ${bytes(data.acquisition.actual_bytes)}. Provenance is user-declared; a partial read does not verify a full-file SHA.`;finish();
         }catch(error){fail('TIFF import rejected: '+error.message+' Previous valid comparison retained.');$('raster-status').textContent='Import rejected.';finish();}
       };
@@ -217,7 +244,7 @@ async function start(){
     map.attributionControl.setPrefix('<a href="https://leafletjs.com/">Leaflet</a>');map.attributionControl.addAttribution('Local cells; no basemap');
     map.on('move',()=>{if(i===0)updateOverview();if(moving||!$('sync').checked)return;moving=true;maps.forEach(other=>{if(other!==map)other.setView(map.getCenter(),map.getZoom(),{animate:false});});moving=false;});
     map.on('click',event=>{const point=event.latlng;if(!drawing){if(!layers.length)return;$('inspect-panel').value=i;$('inspect-lon').value=point.lng;$('inspect-lat').value=point.lat;inspect(i,point.lng,point.lat);return;}if(!firstCorner){firstCorner=point;$('draw-help').textContent='First corner set. Click the opposite corner; Escape cancels.';}else{try{updateDraft([Math.min(firstCorner.lng,point.lng),Math.min(firstCorner.lat,point.lat),Math.max(firstCorner.lng,point.lng),Math.max(firstCorner.lat,point.lat)]);stopDrawing();}catch(error){fail(error.message);}}});
-    $(`layer-${i}`).addEventListener('change',()=>{cancelLoad('Layer selection changed. Previous windows retained.');cancelImport('Layer selection changed; plan again.');renderLayer(i);comparisonUse='loaded windows';acquiredIds.clear();renderResults();updateOverview();});
+    $(`layer-${i}`).addEventListener('change',()=>{cancelLoad('Layer selection changed. Previous windows retained.');cancelImport('Layer selection changed; plan again.');try{const display=prepareDisplay(panelLayers(),bounds);compare(selectedLayers(),bounds);comparisonUse='loaded windows';acquiredIds.clear();updateBounds(bounds,display);updateOverview();}catch(error){$(`layer-${i}`).value=$(`layer-${i}`).dataset.committed;fail('Layer selection rejected: '+error.message+' Previous valid comparison retained.');}});
     const fit=document.createElement('button');fit.textContent='Fit grid';fit.title='Zoom to this panel’s selected layer';fit.onclick=()=>map.fitBounds(ll(extent([layers.find(l=>l.metadata.id===$(`layer-${i}`).value)])),{animate:false});$(`layer-${i}`).parentElement.append(fit);
   });
   updateDraft(demo.default_aoi);
@@ -228,7 +255,7 @@ async function start(){
   $('example').onclick=()=>updateDraft(demo.default_aoi);
   $('use-map').onclick=()=>{const b=maps[0].getBounds();try{updateDraft([b.getWest(),b.getSouth(),b.getEast(),b.getNorth()]);}catch(error){fail(error.message);}};
   $('load-cancel').onclick=()=>cancelLoad();
-  $('compare-loaded').onclick=()=>{try{const region=validateBounds(draftBounds);compare(selectedLayers(),region);cancelLoad('Using loaded windows.');cancelImport('Comparison changed; plan again.');comparisonUse='loaded windows';acquiredIds.clear();updateBounds(region);$('status').textContent='Compared already loaded windows. No new pixels read; area beyond their native support has no coverage.';}catch(error){fail(error.message+' Previous valid comparison retained.');}};
+  $('compare-loaded').onclick=()=>{try{const region=validateBounds(draftBounds);compare(selectedLayers(),region);const display=prepareDisplay(panelLayers(),region);cancelLoad('Using loaded windows.');cancelImport('Comparison changed; plan again.');comparisonUse='loaded windows';acquiredIds.clear();updateBounds(region,display);$('status').textContent='Compared already loaded windows. No new pixels read; area beyond their native support has no coverage.';}catch(error){fail(error.message+' Previous valid comparison retained.');}};
   $('reset').textContent='Fit selected grids';
   $('reset').onclick=()=>maps.forEach(map=>map.fitBounds(ll(extent(selectedLayers())),{animate:false}));
   const fitArea=document.createElement('button');fitArea.textContent='Fit study bounds';fitArea.type='button';fitArea.onclick=()=>{if(draftBounds)maps.forEach(map=>map.fitBounds(ll(draftBounds),{animate:false}));};$('example').after(fitArea);
@@ -258,8 +285,9 @@ async function start(){
       const layer=importGeoJSON(document);layer.metadata={...removeBundleClaims(layer.metadata),file_declarations:{name:file.name,size:file.size,last_modified:file.lastModified,reader:'Rectangular GeoJSON count-cell validator'},provenance_status:'User-declared GeoJSON source metadata; structure checked, source identity not independently verified'};
       if(idTaken(layer.metadata.id))throw Error('That layer id exists or is reserved; choose a unique metadata id.');
       if(layers.length>=16)throw Error('At most 16 layers may be loaded at once. Reload to start a new session.');
-      const initial=!bounds,nextBounds=validateBounds(bounds||layerBounds(layer));compare([layer],nextBounds);
-      layers.push(layer);addOptions();$('layer-0').value=layer.metadata.id;if(initial)maps.forEach((_,i)=>renderLayer(i));else renderLayer(0);maps[0].fitBounds(ll(extent([layer])),{animate:false});comparisonUse='loaded windows';acquiredIds.clear();if(initial)updateBounds(nextBounds);else renderResults();updateOverview();clearError();$('status').textContent=`Imported ${layer.metadata.title} (${layer.cells.length} cells). First panel fitted to its extent; use “Fit study bounds” to return to your draft. Imported data stay in this browser session.`;
+      const nextBounds=validateBounds(bounds||layerBounds(layer));compare([layer],nextBounds);
+      const selected=layers.length?panelLayers():Array(4).fill(layer);selected[0]=layer;const display=prepareDisplay(selected,nextBounds);
+      layers.push(layer);addOptions();$('layer-0').value=layer.metadata.id;maps[0].fitBounds(ll(extent([layer])),{animate:false});comparisonUse='loaded windows';acquiredIds.clear();updateBounds(nextBounds,display);updateOverview();clearError();$('status').textContent=`Imported ${layer.metadata.title} (${layer.cells.length} cells). First panel fitted to its extent; use “Fit study bounds” to return to your draft. Imported data stay in this browser session.`;
     }catch(error){if(token===editGeneration)fail('Import rejected: '+error.message);}finally{if(token===editGeneration)event.target.value='';}
   });
   setupRasterImport();
@@ -267,7 +295,7 @@ async function start(){
   for(const id of ['csv','json','svg','reset','compare-loaded'])$(id).disabled=true;
   document.querySelectorAll('.panel-head select,.panel-head button').forEach(el=>el.disabled=true);
   // Read-only state makes the documented calculations inspectable in browser checks.
-  window.populationViewer={maps,get layers(){return layers;},get bounds(){return bounds?.slice();},get draftBounds(){return draftBounds?.slice();},get results(){return structuredClone(results);},get cache(){return {bytes:cache.bytes,entries:cache.entries.size};},get loading(){return !!job;}};
+  window.populationViewer={maps,get layers(){return layers;},get bounds(){return bounds?.slice();},get draftBounds(){return draftBounds?.slice();},get results(){return structuredClone(results);},get classification(){return structuredClone(classification);},get cache(){return {bytes:cache.bytes,entries:cache.entries.size};},get loading(){return !!job;}};
   await loadComparison();
 }
 start().catch(error=>{fail('Unable to start the viewer: '+error.message);$('status').textContent='Viewer loading failed.';});

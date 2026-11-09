@@ -2,7 +2,50 @@
 export const METHOD = 'Spherical area-weighted count allocation; uniform population within each rectangular cell';
 export const METADATA = ['id', 'title', 'source', 'citation', 'license', 'license_url', 'year', 'version', 'synthetic', 'units', 'crs', 'resolution', 'population_concept', 'allocation', 'census_vintage'];
 export const MAX_GRID_CELLS = 262144;
+// ColorBrewer YlOrBr, five sequential classes: https://colorbrewer2.org/#type=sequential&scheme=YlOrBr&n=5
+export const DENSITY_COLORS = Object.freeze(['#ffffd4','#fed98e','#fe9929','#d95f0e','#993404']);
+export const ZERO_DENSITY_COLOR = '#eeeeee';
 const finite = value => typeof value === 'number' && Number.isFinite(value);
+export function cellDensity(population,bounds) {
+  if(!finite(population)||population<0)throw Error('Density requires finite nonnegative native counts.');
+  const value=population/(area(bounds)*6371.0088**2);
+  // Preserve positive versus zero counts even beyond the representable density range.
+  return population===0?0:value===0?Number.MIN_VALUE:Math.min(value,Number.MAX_VALUE);
+}
+export function classifyDensity(layers,bounds) {
+  validateBounds(bounds);
+  const unique=[...new Map(layers.map(layer=>[layer.metadata.id,layer])).values()],samples=[];
+  for(const layer of unique)for(const cell of iterateCells(layer,bounds)){
+    if(cell.population===0)continue;
+    const overlap=intersection(cell.bounds,bounds);if(!overlap)continue;
+    const weight=area(overlap),value=cellDensity(cell.population,cell.bounds);
+    samples.push({value,weight});
+  }
+  samples.sort((a,b)=>a.value-b.value||a.weight-b.weight);
+  const thresholds=[];
+  if(samples.length){
+    // Compensated sums and a few ULPs of area tolerance keep exact quintile
+    // boundaries stable under source order and floating-point geometry arithmetic.
+    let total=0,correction=0;
+    for(const {weight} of samples){const adjusted=weight-correction,next=total+adjusted;correction=(next-total)-adjusted;total=next;}
+    const tolerance=total*8*Number.EPSILON;
+    let index=0,cumulative=samples[0].weight,cumulativeCorrection=0;
+    for(let cut=1;cut<5;cut++){
+      const target=total*cut/5;
+      while(cumulative<target-tolerance&&index<samples.length-1){const adjusted=samples[++index].weight-cumulativeCorrection,next=cumulative+adjusted;cumulativeCorrection=(next-cumulative)-adjusted;cumulative=next;}
+      thresholds.push(samples[index].value);
+    }
+  }
+  return {method:'Shared area-weighted positive-density quantiles',units:'people/km²',bounds:bounds.slice(),layer_ids:unique.map(layer=>layer.metadata.id),percentiles:[20,40,60,80],thresholds,palette:'ColorBrewer YlOrBr (5)',colors:[...DENSITY_COLORS],zero_color:ZERO_DENSITY_COLOR,nodata:'transparent',weight:'Spherical native-cell overlap with committed study bounds; density uses full native-cell area',ties:'Equal values stay together; upper class bounds are inclusive; some classes may be empty',numeric_limits:'Positive density underflow/overflow saturates to the smallest/largest finite positive number for display only; weighted boundaries allow 8 machine epsilons of pooled area'};
+}
+export function densityColor(value,classification) {
+  if(value===null)return null;
+  if(!finite(value)||value<0)throw Error('Density must be finite and nonnegative for display.');
+  if(value===0)return ZERO_DENSITY_COLOR;
+  if(!classification.thresholds.length)return DENSITY_COLORS[0];
+  const index=classification.thresholds.findIndex(upper=>value<=upper);
+  return DENSITY_COLORS[index<0?4:index];
+}
 export function validateBounds(bounds) {
   if (!Array.isArray(bounds) || bounds.length !== 4 || !bounds.every(finite)) throw Error('Bounds need four finite numbers: west, south, east, north.');
   const [w,s,e,n] = bounds;

@@ -162,7 +162,7 @@ def tiff_entries(content):
 def check_bbox_workflow(page, base):
     page.goto(base+"viewer/index.html")
     page.wait_for_function("window.populationViewer?.results.length===4")
-    snapshot = "JSON.stringify({bounds:populationViewer.bounds,results:populationViewer.results,images:[...document.querySelectorAll('.native-grid')].map(i=>i.src),views:populationViewer.maps.map(m=>[m.getCenter().lat,m.getCenter().lng,m.getZoom()])})"
+    snapshot = "JSON.stringify({bounds:populationViewer.bounds,results:populationViewer.results,classification:populationViewer.classification,legends:[...document.querySelectorAll('.legend')].map(l=>l.textContent),images:[...document.querySelectorAll('.native-grid')].map(i=>i.src),views:populationViewer.maps.map(m=>[m.getCenter().lat,m.getCenter().lng,m.getZoom()])})"
     initial = page.evaluate(snapshot)
     initial_cells = page.evaluate("populationViewer.layers.slice(0,4).map(l=>l.grid.values.length)")
     def draft(region):
@@ -393,6 +393,29 @@ def check_viewer(page, base):
         assert abs(result["coverage"]-min(1,expected["aoi_coverage"]))<1e-10
         assert result["intersected_cells"]==expected["aoi_intersected_cells"]
     assert page.locator(".native-grid").count()==4
+    # One shared classifier drives discrete legends, images and export metadata.
+    shared=page.evaluate("populationViewer.classification")
+    assert len(shared["thresholds"])==4 and shared["bounds"]==[3.3,6.45,3.45,6.6]
+    assert shared["colors"]==['#ffffd4','#fed98e','#fe9929','#d95f0e','#993404']
+    assert all(result["metadata"]["display_classification"]==shared for result in original)
+    legends=page.locator('.legend').all_text_contents()
+    assert len(set(legends))==1 and 'Shared modified quantiles' in legends[0]
+    colors=page.locator('#legend-0 .legend-swatch').evaluate_all('(nodes)=>nodes.map(n=>getComputedStyle(n).backgroundColor)')
+    assert colors==['rgb(255, 255, 212)','rgb(254, 217, 142)','rgb(254, 153, 41)','rgb(217, 95, 14)','rgb(153, 52, 4)','rgb(238, 238, 238)']
+    original_images=page.locator('.native-grid').evaluate_all('(nodes)=>nodes.map(n=>n.src)')
+    page.locator('#layer-0').select_option('grid3-2025')
+    changed=page.evaluate('populationViewer.classification')
+    assert changed['layer_ids']==['grid3-2025','landscan-2020','ghspop-2025']
+    assert changed['thresholds']!=shared['thresholds']
+    assert len(set(page.locator('.legend').all_text_contents()))==1
+    changed_images=page.locator('.native-grid').evaluate_all('(nodes)=>nodes.map(n=>n.src)')
+    assert any(a!=b for a,b in zip(original_images[1:],changed_images[1:]))
+    # Moving the duplicate panel leaves the same distinct source set and breaks.
+    page.locator('#layer-0').select_option('landscan-2020')
+    assert page.evaluate('populationViewer.classification.thresholds')==changed['thresholds']
+    page.locator('#layer-0').select_option('worldpop-2025')
+    assert page.evaluate('populationViewer.classification.thresholds')==shared['thresholds']
+    assert page.locator('.native-grid').evaluate_all('(nodes)=>nodes.map(n=>n.src)')==original_images
     assert page.locator(".map path").count()<20  # Native pixels do not become individual SVG nodes.
     assert not page.locator("#error").is_visible()
     assert "01_real_population.ipynb" in page.get_by_role("link",name="Run the notebooks").get_attribute("href")
@@ -526,7 +549,7 @@ def check_viewer(page, base):
     page.wait_for_function("populationViewer.layers.length===10")
     pixels=page.evaluate("""async()=>{const img=document.querySelector('#map-0 .native-grid');await img.decode();const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const x=c.getContext('2d');x.drawImage(img,0,0);return {width:c.width,height:c.height,rgba:Array.from(x.getImageData(0,0,c.width,c.height).data)};}""")
     assert (pixels["width"],pixels["height"])==(3,2),pixels
-    expected=[238,243,223,235,179,215,174,235,0,0,0,0,37,133,119,235,16,52,69,235,102,183,158,235]
+    expected=[238,238,238,255,255,255,212,255,0,0,0,0,254,153,41,255,217,95,14,255,254,217,142,255]
     assert all(abs(actual-wanted)<=1 for actual,wanted in zip(pixels["rgba"],expected)),pixels
     for key,value in (("inspect-panel","0"),("inspect-lon","10.05"),("inspect-lat","19.85")):
         (page.locator('#'+key).select_option(value) if key=="inspect-panel" else page.locator('#'+key).fill(value))
